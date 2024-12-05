@@ -260,3 +260,4 @@ Other References incldue:
 For questions and support, please email samrobbins13@gmail.com with a detailed description of the ask and any accompanying data necessary to provide support. All data will be kept in confidence. 
 
 ## License
+ThermoPy is licensed under the Apache License 2.0.
