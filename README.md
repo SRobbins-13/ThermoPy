@@ -247,13 +247,21 @@ tFunc.plot_AgeVersus_wZoomRegression(
 
 ## References
 
-Example data from Mackaman-Lofland et al. (2024), Lossada et al. (2017), and Fosdick et al. (2015).
+Example data from:
+- [Mackaman-Lofland, C., Lossada, A. C., Fosdick, J. C., Litvak, V. D., Rodríguez, M. P., del Llano, M. B., ... & Giambiagi, L. (2024). Unraveling the tectonic evolution of the Andean hinterland (Argentina and Chile, 30° S) using multi-sample thermal history models. Earth and Planetary Science Letters, 643, 118888.](https://www.sciencedirect.com/science/article/pii/S0012821X24003212?ref=pdf_download&fr=RR-2&rr=8f197268081f8bb5)
+
+- [Lossada, A. C., Giambiagi, L., Hoke, G. D., Fitzgerald, P. G., Creixell, C., Murillo, I., ... & Suriano, J. (2017). Thermochronologic evidence for late Eocene Andean mountain building at 30 S. Tectonics, 36(11), 2693-2713.](https://agupubs.onlinelibrary.wiley.com/doi/pdfdirect/10.1002/2017TC004674)
+
+- [Fosdick, J. C., Carrapa, B., & Ortíz, G. (2015). Faulting and erosion in the Argentine Precordillera during changes in subduction regime: Reconciling bedrock cooling and detrital records. Earth and Planetary Science Letters, 432, 73-83.](https://par.nsf.gov/servlets/purl/10156715)
 
 Other References incldue:
-- Flowers et al. (2022a) - Radiation damage effects on He diffusion
-- Flowers et al. (2022b) - Statistical methods for thermochronometry
-- Ketcham et al. (2011) - Grain size parameters
-- Cooperdock et al. (2019) - eU calculations and applications
+- [R.M. Flowers, P.K. Zeitler, M. Danišík, P.W. Reiners, C. Gautheron, R.A. Ketcham, J.R. Metcalf, D.F. Stockli, E. Enkelmann, R.W. Brown; (U-Th)/He chronology: Part 1. Data, uncertainty, and reporting. GSA Bulletin 2022;; 135 (1-2): 104–136. doi: https://doi.org/10.1130/B36266.1](https://pubs.geoscienceworld.org/gsa/gsabulletin/article/135/1-2/104/613176/U-Th-He-chronology-Part-1-Data-uncertainty-and)
+
+- [R.M. Flowers, R.A. Ketcham, E. Enkelmann, C. Gautheron, P.W. Reiners, J.R. Metcalf, M. Danišík, D.F. Stockli, R.W. Brown; (U-Th)/He chronology: Part 2. Considerations for evaluating, integrating, and interpreting conventional individual aliquot data. GSA Bulletin 2022;; 135 (1-2): 137–161. doi: https://doi.org/10.1130/B36268.1](https://pubs.geoscienceworld.org/gsa/gsabulletin/article/135/1-2/137/613175/U-Th-He-chronology-Part-2-Considerations-for)
+
+- [Ketcham, R. A., Gautheron, C., & Tassan-Got, L. (2011). Accounting for long alpha-particle stopping distances in (U–Th–Sm)/He geochronology: Refinement of the baseline case. Geochimica et Cosmochimica Acta, 75(24), 7779-7791.](https://www.researchgate.net/profile/Cecile-Gautheron/publication/228085661_Accounting_for_long_alpha-particle_stopping_distances_in_U-Th-SmHe_geochronology_Refinement_of_the_baseline_case/links/5a7aec7745851541ce5f6e32/Accounting-for-long-alpha-particle-stopping-distances-in-U-Th-Sm-He-geochronology-Refinement-of-the-baseline-case.pdf)
+
+- [Cooperdock, E. H., Ketcham, R. A., & Stockli, D. F. (2019). Resolving the effects of 2-D versus 3-D grain measurements on apatite (U–Th)/He age data and reproducibility. Geochronology, 1(1), 17-41.](https://gchron.copernicus.org/articles/1/17/2019/gchron-1-17-2019.pdf)
 
 ## Support
 
