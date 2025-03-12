@@ -25,6 +25,7 @@ from matplotlib.axes import Axes
 
 import seaborn as sns
 import random
+import folium
 
 # Statistics Modules
 import numpy as np
@@ -37,6 +38,7 @@ from pathlib import Path
 
 # Typing Modules
 from typing import List, Tuple, Optional, Union
+import warnings
 
 sns.set(style='white')
 
@@ -52,6 +54,10 @@ GREY60 = "#999999"
 GREY75 = "#bfbfbf"
 GREY91 = "#e8e8e8"
 GREY98 = "#fafafa"
+
+# Suppress font warnings
+warnings.filterwarnings("ignore", category=UserWarning, message="Glyph.*missing from font")
+
 
 #######################################################################
 # Functions for loading and saving data from/to Excel 
@@ -948,10 +954,29 @@ def plot_regression(ax: Axes, df: pd.DataFrame, plot_df: pd.DataFrame, y_variabl
     -------
     None
     """
-    if len(df['Sample'].unique()) > 1:
-        p_x, p_y, lower, upper = confidence_intervals(df, plot_df, y_variable, chronometer=chronometer, weightedBy = weightedBy)
+    # Filter datasets to only include rows with valid Mean and StDev values (example case - rejecting all data points for a sample, but still wanting to show the rejected datapoints in the plot)
+    column_mapping = {
+        'unweighted': {'Mean': 'Mean', 'StDev': 'StDev', 'SEsd': 'SEsd', 'SEiu': 'SEiu'},
+        'inverse_variance': {'Mean': 'Mean_w', 'StDev': 'StDev_w', 'SEsd': 'SEsd_w', 'SEiu': 'SEiu_w'},
+        'relative_deviation': {'Mean': 'Mean_rw', 'StDev': 'StDev_rw', 'SEsd': 'SEsd_rw', 'SEiu': 'SEiu_rw'}
+    }
+    
+    # Get column names for the selected weighting method
+    selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted'])
+    
+    # Filter dataframes to only include valid entries
+    df_filtered = df[df[selected_columns['Mean']].notna() & df[selected_columns['StDev']].notna()]
+    plot_df_filtered = plot_df[(plot_df['Mineral'] == chronometer) & 
+                               plot_df[selected_columns['Mean']].notna() & 
+                               plot_df[selected_columns['StDev']].notna()]
+    
+    # Only proceed with regression if we have sufficient data
+    if len(df_filtered['Sample'].unique()) > 1 and not df_filtered.empty and not plot_df_filtered.empty:
+        p_x, p_y, lower, upper = confidence_intervals(df_filtered, plot_df_filtered, y_variable, 
+                                                     chronometer=chronometer, weightedBy=weightedBy)
         ax.plot(p_y, p_x, color="grey", label="Regression Line")
         ax.fill_betweenx(p_x, lower, upper, color=color, alpha=0.3)
+
 
 def plotElevationProfile(samples: pd.DataFrame, x_variable: str, transect: Optional[str] = None, colorBy: Optional[str] = None,
     x_bounds: Optional[Tuple[float, float]] = None, y_bounds: Optional[Tuple[float, float]] = None,
@@ -1050,15 +1075,15 @@ def plotElevationProfile(samples: pd.DataFrame, x_variable: str, transect: Optio
 
         # Optional sample label, only if the sample is within x_bounds
         if label_samples and (
-            (x_bounds is None or (x_bounds[0] <= row[x_variable] <= x_bounds[1])) and
-            (y_bounds is None or (y_bounds[0] <= row.Elevation_m <= y_bounds[1]))
+            (x_bounds is None or (x_bounds[0] <= getattr(row, x_variable) <= x_bounds[1])) and
+            (y_bounds is None or (y_bounds[0] <= getattr(row, Elevation_m) <= y_bounds[1])) 
         ):
             ax.text(
                 getattr(row, x_variable) + label_offset[0], 
                 row.Elevation_m + label_offset[1], 
                 str(row.Sample),
                 fontsize=12, 
-                fontname="Arial", 
+                fontname="Arial",
                 rotation=90, 
                 va='center', 
                 ha='left', 
@@ -1693,14 +1718,6 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
 
     # Get the correct columns based on weightedBy
     selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted']) 
-
-    # # Function to lighten a color (for standard error option)
-    # def lighten_color(color, amount=0.7):
-    #     # Convert the color to RGB
-    #     base_color = mcolors.to_rgba(color)
-    #     # Interpolate between the color and white
-    #     new_color = [1 - (1 - component) * (1 - amount) for component in base_color[:3]] + [base_color[3]]
-    #     return new_color
     
     ## orient the histogram plot correctly to correspond with 'Age' axis
     # Age on the x-axis
@@ -2233,12 +2250,32 @@ def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame
     colors = {'keep': 'black', 'reject': 'gray'}
     mineral_markers = {'AHe': AHeMarker, 'ZHe': ZHeMarker, 'AFT': AFTMarker, 'ZFT': ZFTMarker}
     
+    # for ax in [ax1, ax2]:
+    #     for outlier, marker in outlier_markers.items():
+    #         df = full_aliquot_df[full_aliquot_df['outlier'] == outlier]
+    #         ax.scatter(df['Corrected_Date_Ma'], df[y_variable], marker=marker, color=colors[outlier])
     for ax in [ax1, ax2]:
-        for outlier, marker in outlier_markers.items():
-            df = full_aliquot_df[full_aliquot_df['outlier'] == outlier]
-            ax.scatter(df['Corrected_Date_Ma'], df[y_variable], marker=marker, color=colors[outlier])
+        # Plot rejected data points with X markers
+        rejected_df = full_aliquot_df[full_aliquot_df['outlier'] == 'reject']
+        ax.scatter(
+            x=rejected_df.Corrected_Date_Ma,
+            y=rejected_df[y_variable],
+            marker=outlier_markers['reject'],
+            color=colors['reject']
+        )
+        
+        # Plot non-rejected data points with mineral-specific markers
+        non_rejected_df = full_aliquot_df[full_aliquot_df['outlier'] == 'keep']
+        for mineral, marker in mineral_markers.items():
+            df = non_rejected_df[non_rejected_df['Mineral'] == mineral]
+            ax.scatter(
+                x=df.Corrected_Date_Ma,
+                y=df[y_variable],
+                marker=marker,
+                color=colors['keep']
+            )
 
-    # Plot sample means with error bars
+    # Specify the marker style based on mineral (thermochronometer)
     mineral_styles = {
         'AHe': (AHeMarker, AHeColor, AHeMarkerSize),
         'ZHe': (ZHeMarker, ZHeColor, ZHeMarkerSize),
@@ -2256,12 +2293,12 @@ def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame
     # Get the correct columns based on weightedBy
     selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted']) 
 
+    # Plot sample means with error bars
     for index, row in plot_data.iterrows():
         marker, color, size = mineral_styles.get(row['Mineral'], ('o', 'maroon', 10))
         label = row['Sample']
         for ax in [ax1, ax2]:
-            # ax.errorbar(row['Mean'], row[y_variable], xerr=row['StDev'], ecolor=color, mfc=color, marker=marker, ms=size, mec='black', mew=1, elinewidth = 3)
-
+            
             # Use the selected columns for x-value and xerr
             ax.errorbar(
                 row[selected_columns['Mean']], row[y_variable],
@@ -2284,8 +2321,6 @@ def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame
                     raise ValueError("Invalid option for SE_basedOn. Choose from 'SD', 'IU', or 'max'.")
 
                 
-                #ax.errorbar(row['Mean'], row[y_variable], xerr=xerr_value, ecolor=lighter_color, fmt='none', mew=1, elinewidth=3)
-
                 ax.errorbar(
                     row[selected_columns['Mean']], row[y_variable],
                     xerr=xerr_value, ecolor=lighter_color, fmt='none', mew=1, elinewidth=3
@@ -2987,3 +3022,144 @@ def plot_AgeVersus_wZoomRegressionHistogram(samples: pd.DataFrame, aliquots: pd.
         plt.savefig(filepath, dpi = 'figure', bbox_inches='tight', pad_inches = 0.5)
             
     plt.show();
+
+def plotSampleMapInteractive(samples: pd.DataFrame, 
+    transect: Optional[str] = None,
+    center: Optional[Tuple[float, float]] = None,
+    zoom_start: int = 10,
+    AHeColor: str = '#800080',  # darkmagenta in hex
+    ZHeColor: str = '#5f9ea0',  # cadetblue in hex
+    AFTColor: str = '#808080',  # gray in hex
+    ZFTColor: str = '#228b22',  # forestgreen in hex
+    tiles: str = 'OpenTopoMap',
+    include_terrain: bool = True,
+    include_satellite: bool = True,
+    save_html: bool = False,
+    filename: str = 'sample_map.html',
+    saveFolder: str = 'Plots') -> folium.Map:
+    """
+    Creates an interactive map showing sample locations using Folium.
+
+    Parameters
+    ----------
+    samples : pd.DataFrame
+        DataFrame containing sample data with columns for Longitude, Latitude, Sample ID, and Mineral type.
+    transect : str, optional
+        Specific transect to plot. If None, plots all samples.
+    center : tuple of float, optional
+        (latitude, longitude) for map center. If None, calculates from data.
+    zoom_start : int, optional
+        Initial zoom level for the map.
+    AHeColor : str, optional
+        Hex color for AHe samples.
+    ZHeColor : str, optional
+        Hex color for ZHe samples.
+    AFTColor : str, optional
+        Hex color for AFT samples.
+    ZFTColor : str, optional
+        Hex color for ZFT samples.
+    tiles : str, optional
+        Base map tile set. Options include 'OpenTopoMap', 'OpenStreetMap', etc.
+    include_terrain : bool, optional
+        If True, adds a terrain view layer.
+    include_satellite : bool, optional
+        If True, adds a satellite view layer.
+    save_html : bool, optional
+        If True, saves the map as an HTML file.
+    filename : str, optional
+        Filename for saving the map if save_html is True.
+    saveFolder : str, optional
+        Folder to save the HTML file in.
+
+    Returns
+    -------
+    folium.Map
+        The created Folium map object.
+    """
+    import folium
+    from folium import plugins
+    
+    # Filter data for specific transect if specified
+    plot_data = samples[samples['Transect'] == transect] if transect else samples.copy()
+    
+    # Calculate center if not provided
+    if center is None:
+        center = [plot_data['Latitude'].mean(), plot_data['Longitude'].mean()]
+    
+    # Create base map
+    m = folium.Map(location=center, 
+                   zoom_start=zoom_start,
+                   tiles=tiles)
+    
+    # Add optional layers
+    if include_terrain:
+        folium.TileLayer('Stamen Terrain').add_to(m)
+    if include_satellite:
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri',
+            name='Satellite'
+        ).add_to(m)
+    
+    # Define marker styles for each sample type
+    mineral_styles = {
+        'AHe': {'color': AHeColor, 'icon': 'star'},
+        'ZHe': {'color': ZHeColor, 'icon': 'diamond'},
+        'AFT': {'color': AFTColor, 'icon': 'triangle'},
+        'ZFT': {'color': ZFTColor, 'icon': 'circle'}
+    }
+    
+    # Create feature groups for each mineral type
+    feature_groups = {mineral: folium.FeatureGroup(name=mineral) 
+                     for mineral in mineral_styles.keys()}
+    
+    # Plot each sample
+    for idx, row in plot_data.iterrows():
+        style = mineral_styles.get(row['Mineral'], {'color': 'black', 'icon': 'circle'})
+        
+        # Create popup content
+        popup_content = f"""
+        <div style="font-family: Arial;">
+            <b>Sample:</b> {row['Sample']}<br>
+            <b>Type:</b> {row['Mineral']}<br>
+            <b>Latitude:</b> {row['Latitude']:.4f}°S<br>
+            <b>Longitude:</b> {row['Longitude']:.4f}°W<br>
+        """
+        if 'Mean' in row:
+            popup_content += f"<b>Age:</b> {row['Mean']:.1f} ± {row['StDev']:.1f} Ma<br>"
+        popup_content += "</div>"
+        
+        # Create marker
+        marker = folium.Marker(
+            location=[row['Latitude'], row['Longitude']],
+            popup=folium.Popup(popup_content, max_width=300),
+            icon=plugins.BeautifyIcon(
+                icon=style['icon'],
+                icon_shape='marker',
+                border_color=style['color'],
+                background_color=style['color'],
+                text_color='white',
+                inner_icon_style='margin-top:0;'
+            )
+        )
+        
+        # Add to appropriate feature group
+        marker.add_to(feature_groups[row['Mineral']])
+    
+    # Add all feature groups to map
+    for group in feature_groups.values():
+        group.add_to(m)
+    
+    # Add layer control
+    folium.LayerControl().add_to(m)
+    
+    # Add scale bar
+    plugins.MousePosition().add_to(m)
+    
+    # Save if requested
+    if save_html:
+        pathlib.Path(saveFolder).mkdir(parents=True, exist_ok=True)
+        filepath = f"{saveFolder}/{filename}"
+        m.save(filepath)
+    
+    return m
