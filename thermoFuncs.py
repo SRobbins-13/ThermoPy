@@ -905,7 +905,7 @@ def filter_regression_data(df: pd.DataFrame, mineral: str, exclude_outliers: boo
             df.at[val, 'outlier'] = 'reject'
     return filtered_df
 
-def lighten_color(color: str, amount: float=0.7)-> List[float]:
+def _lighten_color(color: str, amount: float=0.7)-> List[float]:
     """
     Lightens a given color by interpolating it with white.
 
@@ -1258,14 +1258,6 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
     # Get the correct columns based on weightedBy
     selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted']) 
 
-    # # Function to lighten a color (for standard error option)
-    # def lighten_color(color, amount=0.7):
-    #     # Convert the color to RGB
-    #     base_color = mcolors.to_rgba(color)
-    #     # Interpolate between the color and white
-    #     new_color = [1 - (1 - component) * (1 - amount) for component in base_color[:3]] + [base_color[3]]
-    #     return new_color
-
     if y_variable == 'Age':
         # Plotting All Data Points 
         if show_aliquots:
@@ -1302,7 +1294,7 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
             )
             if plot_SE:
                 # Apply the lighter color for plotting SE
-                lighter_color = lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
+                lighter_color = _lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
 
                 # Select the appropriate xerr column based on SE_basedOn
                 if SE_basedOn == 'SD':
@@ -1461,16 +1453,8 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
             )
 
             if plot_SE:
-                # Function to lighten a color
-                def lighten_color(color, amount=0.7):
-                    # Convert the color to RGB
-                    base_color = mcolors.to_rgba(color)
-                    # Interpolate between the color and white
-                    new_color = [1 - (1 - component) * (1 - amount) for component in base_color[:3]] + [base_color[3]]
-                    return new_color
-
                 # Apply the lighter color for plotting SE
-                lighter_color = lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
+                lighter_color = _lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
 
                 # Select the appropriate xerr column based on SE_basedOn
                 if SE_basedOn == 'SD':
@@ -1776,7 +1760,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
             # Plot Standard Error (if specified)
             if plot_SE:
                 # Apply the lighter color for plotting SE
-                lighter_color = lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
+                lighter_color = _lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
 
                 # Select the appropriate xerr column based on SE_basedOn
                 if SE_basedOn == 'SD':
@@ -1947,7 +1931,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
             # Plot Standard Error (if specified)
             if plot_SE:
                 # Apply the lighter color for plotting SE
-                lighter_color = lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
+                lighter_color = _lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
         
                 # Select the appropriate xerr column based on SE_basedOn
                 if SE_basedOn == 'SD':
@@ -2308,7 +2292,7 @@ def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame
             
             if plot_SE:
                 # Apply the lighter color for plotting SE
-                lighter_color = lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
+                lighter_color = _lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
 
                 # Select the appropriate xerr column based on SE_basedOn
                 if SE_basedOn == 'SD':
@@ -2776,7 +2760,7 @@ def plot_AgeVersus_wZoomRegressionHistogram(samples: pd.DataFrame, aliquots: pd.
 
             if plot_SE:
                 # Apply the lighter color for plotting SE
-                lighter_color = lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
+                lighter_color = _lighten_color(color, amount=0.7)  # adjust 'amount' for more brightness
 
                 # Select the appropriate xerr column based on SE_basedOn
                 if SE_basedOn == 'SD':
@@ -3163,3 +3147,4 @@ def plotSampleMapInteractive(samples: pd.DataFrame,
         m.save(filepath)
     
     return m
+
