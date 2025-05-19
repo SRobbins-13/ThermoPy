@@ -225,7 +225,7 @@ tFunc.plotAgeVersus_wHistogram(
 
 ```python
 # Plot age vs structural level with regression and zoom
-tFunc.plot_AgeVersus_wZoomRegression(
+tFunc.plot_AgeVersus_wZoomIn(
     samples, aliquots,
     transect='AN',
     y_variable='Elevation_m',
