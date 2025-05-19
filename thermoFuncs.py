@@ -645,8 +645,13 @@ def calculateWeightedRelativeDeviationSummaryStats(samples: pd.DataFrame, aliquo
 #######################################################################
 # Functions for plotting thermochronologic data 
 #######################################################################
-def plot_samples_eU_Rft(sample_list: List[str], aliquots: pd.DataFrame, radius: str, plot_histogram: bool = False, 
-    bin_width: int = 10, kde_overlay: bool = False, savefig: bool = False) -> None:
+def plot_samples_eU_Rft(sample_list: List[str], 
+                        aliquots: pd.DataFrame, 
+                        radius: str, 
+                        plot_histogram: bool = False, 
+                        bin_width: int = 10, 
+                        kde_overlay: bool = False, 
+                        savefig: bool = False) -> None:
     """
     Generates plots for each sample in `sample_list`, showing eU (effective Uranium) vs Corrected Age, 
     and Rft (or Rs) vs Corrected Age. Optionally includes a histogram of Corrected Age with configurable bin width 
@@ -786,16 +791,20 @@ def plot_samples_eU_Rft(sample_list: List[str], aliquots: pd.DataFrame, radius: 
 
         plt.show();
 
-def confidence_intervals(transectData: pd.DataFrame, sample_data: pd.DataFrame, variable: str, chronometer: str, 
-    weightedBy: str)-> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def _confidence_intervals(aliquotData: pd.DataFrame, 
+                         sampleData: pd.DataFrame, 
+                         variable: str, 
+                         chronometer: str, 
+                         weightedBy: str)-> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculates the regression line and confidence intervals for a given dataset.
+    Age is always the dependent variable in the regression, but can be plotted on either axis.
 
     Parameters
     ----------
-    transectData : pd.DataFrame
+    aliquotData : pd.DataFrame
         DataFrame containing aliquot ages with columns 'Corrected_Date_Ma', 'Mean', 'StDev', and specified `variable`.
-    sample_data : pd.DataFrame
+    sampleData : pd.DataFrame
         DataFrame containing sample data with columns 'Mineral', 'Mean', 'StDev', and specified `variable`.
     variable : str
         The independent variable for the regression, either 'Elevation_m' or 'Latitude'.
@@ -815,6 +824,10 @@ def confidence_intervals(transectData: pd.DataFrame, sample_data: pd.DataFrame, 
     upper : np.ndarray
         Upper confidence interval boundary for the predicted y-values.
     """
+    # Make sure dataframes are sorted in sample order
+    aliquotData.sort_values(by='Sample', inplace = True)
+    sampleData.sort_index(inplace = True)
+
     # Define column mapping based on weightedBy
     column_mapping = {
         'unweighted': {'Mean': 'Mean', 'StDev': 'StDev', 'SEsd': 'SEsd', 'SEiu': 'SEiu'},
@@ -825,30 +838,32 @@ def confidence_intervals(transectData: pd.DataFrame, sample_data: pd.DataFrame, 
     # Select columns based on weightedBy
     selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted'])
 
-    # Filter samples by the specified chronometer type
-    transectSamples = sample_data[sample_data.Mineral == chronometer]
-
     # Convert relevant data columns to numpy arrays
-    yi = transectData['Corrected_Date_Ma'].to_numpy()
-    y = transectData[selected_columns['Mean']].to_numpy()
-    x = transectData[variable].to_numpy()
-    w = transectData[selected_columns['StDev']].to_numpy()
-    y2 = transectSamples[selected_columns['Mean']].to_numpy()
-    x2 = transectSamples[variable].to_numpy()
-    w2 = transectSamples[selected_columns['StDev']].to_numpy()
+    # Individual Aliquot Data
+    yi = aliquotData['Corrected_Date_Ma'].to_numpy() # individual aliquot ages (dependent variable, aliquot level)
+    y = aliquotData[selected_columns['Mean']].to_numpy() # sample mean ages associated with each aliquot
+    x = aliquotData[variable].to_numpy() # independent variable associated with each aliquot
+    w = aliquotData[selected_columns['StDev']].to_numpy() # sample mean age stdev associated with each aliquot
+
+    # Sample Data
+    y2 = sampleData[selected_columns['Mean']].to_numpy() # sample mean ages
+    x2 = sampleData[variable].to_numpy() # sample independent variable 
+    w2 = sampleData[selected_columns['StDev']].to_numpy() # sample mean ages stdev
 
     # Calculate weighted regression parameters based on chronometer type
     S, Sx, Sxx, Sy, Sxy = sum(1 / w2**2), sum(x2 / w2**2), sum((x2**2) / w2**2), sum(y2 / w2**2), sum((x2 * y2) / w2**2)
+
     if chronometer in ('AFT', 'ZFT'):
         Sx = sum(x / w2**2)
         Sxy = sum(x * y2 / w2**2)
-    delta = S * Sxx - Sx**2
+
+    delta = (S * Sxx) - (Sx**2)
 
     # Calculate regression coefficients (slope, intercept) and their errors
-    m = ((S * Sxy) - (Sx * Sy)) / delta
-    m_err = S / delta
-    b = ((Sxx * Sy) - (Sx * Sxy)) / delta
-    b_err = Sxx / delta
+    m = ((S * Sxy) - (Sx * Sy)) / delta # Slope: change in Age per unit change in variable
+    m_err = np.sqrt(S / delta) 
+    b = ((Sxx * Sy) - (Sx * Sxy)) / delta # Intercept: Age when variable = 0
+    b_err = np.sqrt(Sxx / delta)
 
     # Fit regression line and calculate residuals
     fit_y = m * x + b
@@ -867,12 +882,15 @@ def confidence_intervals(transectData: pd.DataFrame, sample_data: pd.DataFrame, 
 
     # Predict y-values and calculate confidence intervals
     p_y = m * p_x + b
-    lower, upper = p_y - confs, p_y + confs
+    lower, upper = p_y - abs(confs), p_y + abs(confs)
 
     return p_x, p_y, lower, upper
 
-def filter_regression_data(df: pd.DataFrame, mineral: str, exclude_outliers: bool, exclude_samples: Optional[List[str]], exclude_aliquots: Optional[List[str]]
-    ) -> pd.DataFrame:
+def _filter_regression_data(df: pd.DataFrame, 
+                           mineral: str, 
+                           exclude_outliers: bool, 
+                           exclude_samples: Optional[List[str]], 
+                           exclude_aliquots: Optional[List[str]]) -> pd.DataFrame:
     """
     Filter data based on specific exclusions for outliers, samples, and aliquots.
 
@@ -928,8 +946,8 @@ def _lighten_color(color: str, amount: float=0.7)-> List[float]:
     new_color = [1 - (1 - component) * (1 - amount) for component in base_color[:3]] + [base_color[3]]
     return new_color
 
-def plot_regression(ax: Axes, df: pd.DataFrame, plot_df: pd.DataFrame, y_variable: str, color: str, 
-    chronometer: str, weightedBy: str = 'unweighted') -> None:
+def _plot_regression(ax: Axes, aliquot_df: pd.DataFrame, sample_df: pd.DataFrame, y_variable: str, color: str, 
+    chronometer: str, weightedBy: str = 'unweighted', age_on_x_axis: bool = False) -> None:
     """
     Plots the regression line and confidence intervals on the given axes.
 
@@ -937,10 +955,10 @@ def plot_regression(ax: Axes, df: pd.DataFrame, plot_df: pd.DataFrame, y_variabl
     ----------
     ax : Axes
         Matplotlib Axes object on which to plot.
-    df : pd.DataFrame
-        DataFrame containing data points to calculate the regression.
-    plot_df : pd.DataFrame
-        DataFrame with data for plotting the regression line and confidence intervals.
+    aliquot_df : pd.DataFrame
+        DataFrame containing data points to calculate the regression. (Individual Aliquot Level Data)
+    sample_df : pd.DataFrame
+        DataFrame with data for plotting the regression line and confidence intervals. (Sample Level Data)
     y_variable : str
         The variable to plot on the y-axis (e.g., 'Latitude', 'Longitude', 'Elevation', 'Structural Level').
     color : str
@@ -965,27 +983,46 @@ def plot_regression(ax: Axes, df: pd.DataFrame, plot_df: pd.DataFrame, y_variabl
     selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted'])
     
     # Filter dataframes to only include valid entries
-    df_filtered = df[df[selected_columns['Mean']].notna() & df[selected_columns['StDev']].notna()]
-    plot_df_filtered = plot_df[(plot_df['Mineral'] == chronometer) & 
-                               plot_df[selected_columns['Mean']].notna() & 
-                               plot_df[selected_columns['StDev']].notna()]
+    aliquot_df_filtered = aliquot_df[aliquot_df[selected_columns['Mean']].notna() & aliquot_df[selected_columns['StDev']].notna()]
+    sample_df_filtered = sample_df[(sample_df['Mineral'] == chronometer) & 
+                               sample_df[selected_columns['Mean']].notna() & 
+                               sample_df[selected_columns['StDev']].notna()]
     
-    # Only proceed with regression if we have sufficient data
-    if len(df_filtered['Sample'].unique()) > 1 and not df_filtered.empty and not plot_df_filtered.empty:
-        p_x, p_y, lower, upper = confidence_intervals(df_filtered, plot_df_filtered, y_variable, 
+    # Only proceed with regression if there is sufficient data
+    if len(aliquot_df_filtered['Sample'].unique()) > 1 and not aliquot_df_filtered.empty and not sample_df_filtered.empty:
+        p_x, p_y, lower, upper = _confidence_intervals(aliquot_df_filtered, sample_df_filtered, y_variable, 
                                                      chronometer=chronometer, weightedBy=weightedBy)
-        ax.plot(p_y, p_x, color="grey", label="Regression Line")
-        ax.fill_betweenx(p_x, lower, upper, color=color, alpha=0.3)
 
+        if age_on_x_axis:
+            ax.plot(p_y, p_x, color="grey", label="Regression Line")
+            ax.fill_betweenx(p_x, lower, upper, color=color, alpha=0.3)
+        else:
+            ax.plot(p_x, p_y, color="grey", label="Regression Line")
+            ax.fill_between(p_x, lower, upper, color=color, alpha=0.3)
 
-def plotElevationProfile(samples: pd.DataFrame, x_variable: str, transect: Optional[str] = None, colorBy: Optional[str] = None,
-    x_bounds: Optional[Tuple[float, float]] = None, y_bounds: Optional[Tuple[float, float]] = None,
-    label_samples: bool = True, label_offset: Tuple[float, float] = (0, 0),
-    AHeColor: str = 'darkmagenta', AHeMarker: str = 'h', AHeMarkerSize: int = 12,
-    ZHeColor: str = 'cadetblue', ZHeMarker: str = 'D', ZHeMarkerSize: int = 10,
-    AFTColor: str = 'gray', AFTMarker: str = '^', AFTMarkerSize: int = 10,
-    ZFTColor: str = 'forestgreen', ZFTMarker: str = 'o', ZFTMarkerSize: int = 10, 
-    savefig: bool = False, savefigFileName: Optional[str] = None, saveFolder: str = 'Plots') -> None:
+def plotElevationProfile(samples: pd.DataFrame, 
+                         x_variable: str, 
+                         transect: Optional[str] = None, 
+                         colorBy: Optional[str] = None,
+                         x_bounds: Optional[Tuple[float, float]] = None, 
+                         y_bounds: Optional[Tuple[float, float]] = None,
+                         label_samples: bool = True, 
+                         label_offset: Tuple[float, float] = (0, 0),
+                         AHeColor: str = 'darkmagenta', 
+                         AHeMarker: str = 'h', 
+                         AHeMarkerSize: int = 12,
+                         ZHeColor: str = 'cadetblue', 
+                         ZHeMarker: str = 'D', 
+                         ZHeMarkerSize: int = 10,
+                         AFTColor: str = 'gray', 
+                         AFTMarker: str = '^', 
+                         AFTMarkerSize: int = 10,
+                         ZFTColor: str = 'forestgreen', 
+                         ZFTMarker: str = 'o', 
+                         ZFTMarkerSize: int = 10, 
+                         savefig: bool = False, 
+                         savefigFileName: Optional[str] = None, 
+                         saveFolder: str = 'Plots') -> None:
     """
     Plots the Elevation profile against Latitude or Longitude (based on user input) for the sample data, allowing customization by 
     chronometer, transect, and appearance settings.
@@ -1144,16 +1181,54 @@ def plotElevationProfile(samples: pd.DataFrame, x_variable: str, transect: Optio
 
     plt.show()
 
-def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str, y_variable: str,
-    transect: Optional[str] = None,show_aliquots: bool = True, 
-    weightedBy : str = 'unweighted', plot_SE: bool = False, SE_basedOn: str = 'max',
-    x_bounds: Optional[Tuple[float, float]] = None, y_bounds: Optional[Tuple[float, float]] = None,
-    label_samples: bool = True, label_offset: Tuple[float, float] = (0, 0), 
-    AHeColor: str = 'darkmagenta', AHeMarker: str = 'h', AHeMarkerSize: int = 12,
-    ZHeColor: str = 'cadetblue', ZHeMarker: str = 'D', ZHeMarkerSize: int = 10,
-    AFTColor: str = 'gray', AFTMarker: str = '^', AFTMarkerSize: int = 10,
-    ZFTColor: str = 'forestgreen', ZFTMarker: str = 'o', ZFTMarkerSize: int = 10,
-    savefig: bool = False, savefigFileName: Optional[str] = None, saveFolder: str = 'Plots') -> None:
+def plotAgeVersus(samples: pd.DataFrame, 
+                  aliquots: pd.DataFrame, 
+                  x_variable: str, 
+                  y_variable: str,
+                  transect: Optional[str] = None,
+                  show_aliquots: bool = True, 
+                  weightedBy : str = 'unweighted', 
+                  plot_SE: bool = False, 
+                  SE_basedOn: str = 'max',
+                  x_bounds: Optional[Tuple[float, float]] = None, 
+                  y_bounds: Optional[Tuple[float, float]] = None,
+                  label_samples: bool = True, 
+                  label_offset: Tuple[float, float] = (0, 0), 
+                  AHeColor: str = 'darkmagenta', 
+                  AHeMarker: str = 'h', 
+                  AHeMarkerSize: int = 12,
+                  ZHeColor: str = 'cadetblue', 
+                  ZHeMarker: str = 'D', 
+                  ZHeMarkerSize: int = 10,
+                  AFTColor: str = 'gray', 
+                  AFTMarker: str = '^', 
+                  AFTMarkerSize: int = 10,
+                  ZFTColor: str = 'forestgreen', 
+                  ZFTMarker: str = 'o', 
+                  ZFTMarkerSize: int = 10,
+                  AHe_regression: bool = False, 
+                  AHeRegressionColor: str = 'cadetblue', 
+                  excludeAHeOutliers: Optional[List[str]] = None,
+                  excludeAHeSamplesRegression: Optional[List[str]] = None, 
+                  excludeAHeAliquotsRegression: Optional[List[str]] = None,
+                  ZHe_regression: bool = False, 
+                  ZHeRegressionColor: str = 'darkmagenta', 
+                  excludeZHeOutliers: Optional[List[str]] = None,
+                  excludeZHeSamplesRegression: Optional[List[str]] = None, 
+                  excludeZHeAliquotsRegression: Optional[List[str]] = None,
+                  AFTRegression: bool = False, 
+                  AFTRegressionColor: str = 'gainsboro', 
+                  excludeAFTOutliers: Optional[List[str]] = None,
+                  excludeAFTSamplesRegression: Optional[List[str]] = None, 
+                  excludeAFTAliquotsRegression: Optional[List[str]] = None,
+                  ZFTRegression: bool = False, 
+                  ZFTRegressionColor: str = 'forestgreen', 
+                  excludeZFTOutliers: Optional[List[str]] = None,
+                  excludeZFTSamplesRegression: Optional[List[str]] = None, 
+                  excludeZFTAliquotsRegression: Optional[List[str]] = None,
+                  savefig: bool = False, 
+                  savefigFileName: Optional[str] = None, 
+                  saveFolder: str = 'Plots') -> None:
     """
     Plots the Cooling vs. a user-specified variable for the data, allowing customization of the x- and y-variables, transect, 
     and appearance settings.
@@ -1175,7 +1250,7 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
     show_aliquots : bool
         If True, shows the individual aliquot ages for each sample.
     weightedBy : str, default='unweighted'
-        Specifies the weighting method, with options such as 'unweighted'.
+        Specifies the weighting method, with options 'unweighted', 'inverse_variance' or 'relative_deviation'.
     plot_SE : bool, default=False
         Whether to plot standard error bars.
     SE_basedOn : str, default='max'
@@ -1212,6 +1287,46 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
         Style for the ZFT marker; default is 'o'.
     ZFTMarkerSize : int, optional
         Size for the ZFT marker; default is 10.
+    AHe_regression : bool, default False
+        Whether to perform regression on AHe data points.
+    AHeRegressionColor : str, default 'cadetblue'
+        Color for the AHe regression line and confidence intervals.
+    excludeAHeOutliers : list of str, optional
+        List of outliers to exclude from AHe regression.
+    excludeAHeSamplesRegression : list of str, optional
+        List of samples to exclude from AHe regression.
+    excludeAHeAliquotsRegression : list of str, optional
+        List of aliquots to exclude from AHe regression.
+    ZHe_regression : bool, default False
+        Whether to perform regression on ZHe data points.
+    ZHeRegressionColor : str, default 'darkmagenta'
+        Color for the ZHe regression line and confidence intervals.
+    excludeZHeOutliers : list of str, optional
+        List of outliers to exclude from ZHe regression.
+    excludeZHeSamplesRegression : list of str, optional
+        List of samples to exclude from ZHe regression.
+    excludeZHeAliquotsRegression : list of str, optional
+        List of aliquots to exclude from ZHe regression.
+    AFTRegression : bool, default False
+        Whether to perform regression on AFT data points.
+    AFTRegressionColor : str, default 'gainsboro'
+        Color for the AFT regression line and confidence intervals.
+    excludeAFTOutliers : list of str, optional
+        List of outliers to exclude from AFT regression.
+    excludeAFTSamplesRegression : list of str, optional
+        List of samples to exclude from AFT regression.
+    excludeAFTAliquotsRegression : list of str, optional
+        List of aliquots to exclude from AFT regression.
+    ZFTRegression : bool, default False
+        Whether to perform regression on ZFT data points.
+    ZFTRegressionColor : str, default 'forestgreen'
+        Color for the ZFT regression line and confidence intervals.
+    excludeZFTOutliers : list of str, optional
+        List of outliers to exclude from ZFT regression.
+    excludeZFTSamplesRegression : list of str, optional
+        List of samples to exclude from ZFT regression.
+    excludeZFTAliquotsRegression : list of str, optional
+        List of aliquots to exclude from ZFT regression.
     savefig : bool, optional
         If True, saves the plot.
     savefigFileName : str, optional
@@ -1259,6 +1374,34 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
     selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted']) 
 
     if y_variable == 'Age':
+        # Specify plot orientation for regression function
+        age_on_x_axis = False
+        
+        # Regressions for each chronometer
+        if AHe_regression:
+            ahe_regression_df = _filter_regression_data(full_aliquot_df, 'AHe', excludeAHeOutliers, excludeAHeSamplesRegression, excludeAHeAliquotsRegression)
+            ahe_regression_sample_df = _filter_regression_data(plot_data, 'AHe', False, excludeAHeSamplesRegression, None)
+
+            _plot_regression(ax, ahe_regression_df, ahe_regression_sample_df, x_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
+
+        if ZHe_regression:
+            zhe_regression_df = _filter_regression_data(full_aliquot_df, 'ZHe', excludeZHeOutliers, excludeZHeSamplesRegression, excludeZHeAliquotsRegression)
+            zhe_regression_sample_df = _filter_regression_data(plot_data, 'ZHe', False, excludeZHeSamplesRegression, None)
+
+            _plot_regression(ax, zhe_regression_df, zhe_regression_sample_df, x_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
+
+        if AFTRegression:
+            aft_regression_df = _filter_regression_data(full_aliquot_df, 'AFT', excludeAFTOutliers, excludeAFTSamplesRegression, excludeAFTAliquotsRegression)
+            aft_regression_sample_df = _filter_regression_data(plot_data, 'AFT', False, excludeAFTSamplesRegression, None)
+
+            _plot_regression(ax, aft_regression_df, aft_regression_sample_df, x_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
+
+        if ZFTRegression:
+            zft_regression_df = _filter_regression_data(full_aliquot_df, 'ZFT', excludeZFTOutliers, excludeZFTSamplesRegression, excludeZFTAliquotsRegression)
+            zft_regression_sample_df = _filter_regression_data(plot_data, 'ZFT', False, excludeZFTSamplesRegression, None)
+
+            _plot_regression(ax, zft_regression_df, zft_regression_sample_df, x_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
+        
         # Plotting All Data Points 
         if show_aliquots:
             # Create separate datasets for rejected and non-rejected data points
@@ -1368,7 +1511,6 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
                                 weight = 'book',
                                 style = 'italic')
 
-        ##########################
         ### Axes and Spine Customization -----------------------------
         ax.spines["left"].set_color('k')
         ax.spines["bottom"].set_color('k')
@@ -1416,9 +1558,36 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
 
         
     elif x_variable == 'Age':
-        # Plotting All Data Points -----------------------------
-        if show_aliquots:
+        # Specify plot orientation for regression function
+        age_on_x_axis = True
 
+        # Regressions for each chronometer
+        if AHe_regression:
+            ahe_regression_df = _filter_regression_data(full_aliquot_df, 'AHe', excludeAHeOutliers, excludeAHeSamplesRegression, excludeAHeAliquotsRegression)
+            ahe_regression_sample_df = _filter_regression_data(plot_data, 'AHe', False, excludeAHeSamplesRegression, None)
+
+            _plot_regression(ax, ahe_regression_df, ahe_regression_sample_df, y_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
+
+        if ZHe_regression:
+            zhe_regression_df = _filter_regression_data(full_aliquot_df, 'ZHe', excludeZHeOutliers, excludeZHeSamplesRegression, excludeZHeAliquotsRegression)
+            zhe_regression_sample_df = _filter_regression_data(plot_data, 'ZHe', False, excludeZHeSamplesRegression, None)
+
+            _plot_regression(ax, zhe_regression_df, zhe_regression_sample_df, y_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
+
+        if AFTRegression:
+            aft_regression_df = _filter_regression_data(full_aliquot_df, 'AFT', excludeAFTOutliers, excludeAFTSamplesRegression, excludeAFTAliquotsRegression)
+            aft_regression_sample_df = _filter_regression_data(plot_data, 'AFT', False, excludeAFTSamplesRegression, None)
+
+            _plot_regression(ax, aft_regression_df, aft_regression_sample_df, y_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
+
+        if ZFTRegression:
+            zft_regression_df = _filter_regression_data(full_aliquot_df, 'ZFT', excludeZFTOutliers, excludeZFTSamplesRegression, excludeZFTAliquotsRegression)
+            zft_regression_sample_df = _filter_regression_data(plot_data, 'ZFT', False, excludeZFTSamplesRegression, None)
+
+            _plot_regression(ax, zft_regression_df, zft_regression_sample_df, y_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
+        
+        # Plotting All Data Points 
+        if show_aliquots:
             # Create separate datasets for rejected and non-rejected data points
             rejected_df = full_aliquot_df[full_aliquot_df['outlier'] == 'reject']
             non_rejected_df = full_aliquot_df[full_aliquot_df['outlier'] == 'keep']
@@ -1441,8 +1610,7 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
                     color=colors['keep']
                 )
         
-        ##########################
-        ### Sample Means w/ Errorbars -----------------------------
+        # Plot Sample Means w/ Errorbars 
         for index, row in plot_data.iterrows():
             marker, color, size = mineral_styles.get(row['Mineral'], ('o', 'maroon', 10))
             label = row.Sample
@@ -1528,7 +1696,6 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
                                 weight = 'book',
                                 style = 'italic')
 
-        ##########################
         ### Axes and Spine Customization -----------------------------
         ax.spines["left"].set_color('k')
         ax.spines["bottom"].set_color('k')
@@ -1574,7 +1741,6 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
                         color=GREY40
                     )
 
-    ##########################
     ### Show and Save Figure -----------------------------
     if savefig:
         pathlib.Path(saveFolder).mkdir(parents=True, exist_ok=True)
@@ -1587,16 +1753,55 @@ def plotAgeVersus(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str
     fig.tight_layout()
     plt.show();   
 
-def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_variable: str, y_variable: str,
-    transect: Optional[str] = None,show_aliquots: bool = True, 
-    weightedBy : str = 'unweighted', plot_SE: bool = False, SE_basedOn: str = 'max',
-    x_bounds: Optional[Tuple[float, float]] = None,y_bounds: Optional[Tuple[float, float]] = None,
-    label_samples: bool = True, label_offset: Tuple[float, float] = (0, 0), bin_width: int = 10,
-    AHeColor: str = 'darkmagenta', AHeMarker: str = 'h', AHeMarkerSize: int = 12,
-    ZHeColor: str = 'cadetblue', ZHeMarker: str = 'D', ZHeMarkerSize: int = 10,
-    AFTColor: str = 'gray', AFTMarker: str = '^', AFTMarkerSize: int = 10,
-    ZFTColor: str = 'forestgreen', ZFTMarker: str = 'o', ZFTMarkerSize: int = 10,
-    savefig: bool = False, savefigFileName: Optional[str] = None, saveFolder: str = 'Plots') -> None:
+def plotAgeVersus_wHistogram(samples: pd.DataFrame, 
+                             aliquots: pd.DataFrame, 
+                             x_variable: str, 
+                             y_variable: str,
+                             transect: Optional[str] = None,
+                             show_aliquots: bool = True, 
+                             weightedBy : str = 'unweighted', 
+                             plot_SE: bool = False, 
+                             SE_basedOn: str = 'max',
+                             x_bounds: Optional[Tuple[float, float]] = None,
+                             y_bounds: Optional[Tuple[float, float]] = None,
+                             label_samples: bool = True, 
+                             label_offset: Tuple[float, float] = (0, 0), 
+                             bin_width: int = 10,
+                             AHeColor: str = 'darkmagenta', 
+                             AHeMarker: str = 'h', 
+                             AHeMarkerSize: int = 12,
+                             ZHeColor: str = 'cadetblue', 
+                             ZHeMarker: str = 'D', 
+                             ZHeMarkerSize: int = 10,
+                             AFTColor: str = 'gray', 
+                             AFTMarker: str = '^', 
+                             AFTMarkerSize: int = 10,
+                             ZFTColor: str = 'forestgreen', 
+                             ZFTMarker: str = 'o', 
+                             ZFTMarkerSize: int = 10,
+                             AHe_regression: bool = False, 
+                             AHeRegressionColor: str = 'cadetblue', 
+                             excludeAHeOutliers: Optional[List[str]] = None,
+                             excludeAHeSamplesRegression: Optional[List[str]] = None, 
+                             excludeAHeAliquotsRegression: Optional[List[str]] = None,
+                             ZHe_regression: bool = False, 
+                             ZHeRegressionColor: str = 'darkmagenta', 
+                             excludeZHeOutliers: Optional[List[str]] = None,
+                             excludeZHeSamplesRegression: Optional[List[str]] = None, 
+                             excludeZHeAliquotsRegression: Optional[List[str]] = None,
+                             AFTRegression: bool = False, 
+                             AFTRegressionColor: str = 'gainsboro', 
+                             excludeAFTOutliers: Optional[List[str]] = None,
+                             excludeAFTSamplesRegression: Optional[List[str]] = None, 
+                             excludeAFTAliquotsRegression: Optional[List[str]] = None,
+                             ZFTRegression: bool = False, 
+                             ZFTRegressionColor: str = 'forestgreen', 
+                             excludeZFTOutliers: Optional[List[str]] = None,
+                             excludeZFTSamplesRegression: Optional[List[str]] = None, 
+                             excludeZFTAliquotsRegression: Optional[List[str]] = None,
+                             savefig: bool = False, 
+                             savefigFileName: Optional[str] = None, 
+                             saveFolder: str = 'Plots') -> None:
     """
     Plots Cooling Age against a specified variable (e.g., Latitude, Longitude, Elevation, Structural Level),
     with a histogram of aliquot cooling ages for each mineral type.
@@ -1618,7 +1823,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
     show_aliquots : bool
         If True, shows the individual aliquot ages for each sample.
     weightedBy : str, default='unweighted'
-        Specifies the weighting method, with options such as 'unweighted'.
+        Specifies the weighting method, with options 'unweighted', 'inverse_variance' or 'relative_deviation'.
     plot_SE : bool, default=False
         Whether to plot standard error bars.
     SE_basedOn : str, default='max'
@@ -1657,6 +1862,46 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
         Style for the ZFT marker; default is 'o'.
     ZFTMarkerSize : int, optional
         Size for the ZFT marker; default is 10.
+    AHe_regression : bool, default False
+        Whether to perform regression on AHe data points.
+    AHeRegressionColor : str, default 'cadetblue'
+        Color for the AHe regression line and confidence intervals.
+    excludeAHeOutliers : list of str, optional
+        List of outliers to exclude from AHe regression.
+    excludeAHeSamplesRegression : list of str, optional
+        List of samples to exclude from AHe regression.
+    excludeAHeAliquotsRegression : list of str, optional
+        List of aliquots to exclude from AHe regression.
+    ZHe_regression : bool, default False
+        Whether to perform regression on ZHe data points.
+    ZHeRegressionColor : str, default 'darkmagenta'
+        Color for the ZHe regression line and confidence intervals.
+    excludeZHeOutliers : list of str, optional
+        List of outliers to exclude from ZHe regression.
+    excludeZHeSamplesRegression : list of str, optional
+        List of samples to exclude from ZHe regression.
+    excludeZHeAliquotsRegression : list of str, optional
+        List of aliquots to exclude from ZHe regression.
+    AFTRegression : bool, default False
+        Whether to perform regression on AFT data points.
+    AFTRegressionColor : str, default 'gainsboro'
+        Color for the AFT regression line and confidence intervals.
+    excludeAFTOutliers : list of str, optional
+        List of outliers to exclude from AFT regression.
+    excludeAFTSamplesRegression : list of str, optional
+        List of samples to exclude from AFT regression.
+    excludeAFTAliquotsRegression : list of str, optional
+        List of aliquots to exclude from AFT regression.
+    ZFTRegression : bool, default False
+        Whether to perform regression on ZFT data points.
+    ZFTRegressionColor : str, default 'forestgreen'
+        Color for the ZFT regression line and confidence intervals.
+    excludeZFTOutliers : list of str, optional
+        List of outliers to exclude from ZFT regression.
+    excludeZFTSamplesRegression : list of str, optional
+        List of samples to exclude from ZFT regression.
+    excludeZFTAliquotsRegression : list of str, optional
+        List of aliquots to exclude from ZFT regression.
     savefig : bool, optional
         If True, saves the plot.
     savefigFileName : str, optional
@@ -1700,10 +1945,10 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
         'relative_deviation': {'Mean': 'Mean_rw', 'StDev': 'StDev_rw', 'SEsd': 'SEsd_rw', 'SEiu': 'SEiu_rw'}
     }
 
-    # Get the correct columns based on weightedBy
+    # Get the correct statistics columns based on weightedBy
     selected_columns = column_mapping.get(weightedBy, column_mapping['unweighted']) 
     
-    ## orient the histogram plot correctly to correspond with 'Age' axis
+    ## Orient the histogram plot correctly to correspond with 'Age' axis
     # Age on the x-axis
     if x_variable == 'Age':
         fig, (ax1,ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 8]}, figsize = (15,8), sharex = True)
@@ -1722,7 +1967,35 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
                     palette=hist_colors, alpha = 0.8,
                     stat = 'count', binwidth = bin_width, kde = True, legend = True)
 
-        ## Plotting Sample Means and Aliquot Data (Axis 2) -----------------------------
+        ## Plotting Sample Means, Aliquot Data, and Regression if specified (Axis 2) -----------------------------
+        # Specify plot orientation for regression function
+        age_on_x_axis = True
+
+        # Regressions for each chronometer
+        if AHe_regression:
+            ahe_regression_df = _filter_regression_data(full_aliquot_df, 'AHe', excludeAHeOutliers, excludeAHeSamplesRegression, excludeAHeAliquotsRegression)
+            ahe_regression_sample_df = _filter_regression_data(plot_data, 'AHe', False, excludeAHeSamplesRegression, None)
+
+            _plot_regression(ax2, ahe_regression_df, ahe_regression_sample_df, y_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
+
+        if ZHe_regression:
+            zhe_regression_df = _filter_regression_data(full_aliquot_df, 'ZHe', excludeZHeOutliers, excludeZHeSamplesRegression, excludeZHeAliquotsRegression)
+            zhe_regression_sample_df = _filter_regression_data(plot_data, 'ZHe', False, excludeZHeSamplesRegression, None)
+
+            _plot_regression(ax2, zhe_regression_df, zhe_regression_sample_df, y_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
+
+        if AFTRegression:
+            aft_regression_df = _filter_regression_data(full_aliquot_df, 'AFT', excludeAFTOutliers, excludeAFTSamplesRegression, excludeAFTAliquotsRegression)
+            aft_regression_sample_df = _filter_regression_data(plot_data, 'AFT', False, excludeAFTSamplesRegression, None)
+
+            _plot_regression(ax2, aft_regression_df, aft_regression_sample_df, y_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
+
+        if ZFTRegression:
+            zft_regression_df = _filter_regression_data(full_aliquot_df, 'ZFT', excludeZFTOutliers, excludeZFTSamplesRegression, excludeZFTAliquotsRegression)
+            zft_regression_sample_df = _filter_regression_data(plot_data, 'ZFT', False, excludeZFTSamplesRegression, None)
+
+            _plot_regression(ax2, zft_regression_df, zft_regression_sample_df, y_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
+
         if show_aliquots:
             # Create separate datasets for rejected and non-rejected data points
             rejected_df = full_aliquot_df[full_aliquot_df['outlier'] == 'reject']
@@ -1876,7 +2149,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
         ax2.tick_params(axis="x", length=5, color=GREY91)
         ax2.tick_params(axis="y", length=5, color=GREY91)
 
-    ## ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    ## --------------------------------------------------------------------------------------------------------------------------------
     # Age on the y-axis
     elif y_variable == 'Age':
         fig, (ax1,ax2) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1, 8]}, figsize = (12,6), sharey = True)
@@ -1894,7 +2167,34 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
                     palette=hist_colors, alpha = 0.8,
                     stat = 'count', binwidth = bin_width, kde = True, legend = True)
             
-        ## Plotting Sample Means and Aliquot Data (Axis 2) 
+        ## Plotting Sample Means, Aliquot Data, and Regression if specified (Axis 2) -----------------------------
+        # Specify plot orientation for regression function
+        age_on_x_axis = False
+        
+        # Regressions for each chronometer
+        if AHe_regression:
+            ahe_regression_df = _filter_regression_data(full_aliquot_df, 'AHe', excludeAHeOutliers, excludeAHeSamplesRegression, excludeAHeAliquotsRegression)
+            ahe_regression_sample_df = _filter_regression_data(plot_data, 'AHe', False, excludeAHeSamplesRegression, None)
+
+            _plot_regression(ax2, ahe_regression_df, ahe_regression_sample_df, x_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
+
+        if ZHe_regression:
+            zhe_regression_df = _filter_regression_data(full_aliquot_df, 'ZHe', excludeZHeOutliers, excludeZHeSamplesRegression, excludeZHeAliquotsRegression)
+            zhe_regression_sample_df = _filter_regression_data(plot_data, 'ZHe', False, excludeZHeSamplesRegression, None)
+
+            _plot_regression(ax2, zhe_regression_df, zhe_regression_sample_df, x_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
+
+        if AFTRegression:
+            aft_regression_df = _filter_regression_data(full_aliquot_df, 'AFT', excludeAFTOutliers, excludeAFTSamplesRegression, excludeAFTAliquotsRegression)
+            aft_regression_sample_df = _filter_regression_data(plot_data, 'AFT', False, excludeAFTSamplesRegression, None)
+
+            _plot_regression(ax2, aft_regression_df, aft_regression_sample_df, x_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
+
+        if ZFTRegression:
+            zft_regression_df = _filter_regression_data(full_aliquot_df, 'ZFT', excludeZFTOutliers, excludeZFTSamplesRegression, excludeZFTAliquotsRegression)
+            zft_regression_sample_df = _filter_regression_data(plot_data, 'ZFT', False, excludeZFTSamplesRegression, None)
+
+            _plot_regression(ax2, zft_regression_df, zft_regression_sample_df, x_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
         if show_aliquots:
             # Create separate datasets for rejected and non-rejected data points
             rejected_df = full_aliquot_df[full_aliquot_df['outlier'] == 'reject']
@@ -2066,21 +2366,55 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, x_va
     fig.tight_layout()
     plt.show();
 
-def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame, transect: Optional[str], y_variable: str,
-    inset_xlim: Tuple[float, float], full_x_bounds: Optional[Tuple[float, float]] = None, y_bounds: Optional[Tuple[float, float]] = None,
-    inset_x_interval: int = 10, full_x_interval: int = 50,
-    weightedBy : str = 'unweighted', plot_SE: bool = False, SE_basedOn: str = 'max',
-    label_samples: bool = True, label_offset: Tuple[int, int] = (5, 5),
-    AHeColor: str = 'cadetblue', AHeMarker: str = 'h',AHeMarkerSize: int = 12,
-    ZHeColor: str = 'darkmagenta',ZHeMarker: str = 'D',ZHeMarkerSize: int = 10,
-    AFTColor: str = 'gray',AFTMarker: str = '^',AFTMarkerSize: int = 12,
-    ZFTColor: str = 'forestgreen',ZFTMarker: str = 'o',ZFTMarkerSize: int = 12,
-    AHe_regression: bool = False, AHeRegressionColor: str = 'cadetblue', excludeAHeOutliers: Optional[List[str]] = None,excludeAHeSamplesRegression: Optional[List[str]] = None, excludeAHeAliquotsRegression: Optional[List[str]] = None,
-    ZHe_regression: bool = False, ZHeRegressionColor: str = 'darkmagenta', excludeZHeOutliers: Optional[List[str]] = None,excludeZHeSamplesRegression: Optional[List[str]] = None, excludeZHeAliquotsRegression: Optional[List[str]] = None,
-    AFTRegression: bool = False, AFTRegressionColor: str = 'gainsboro', excludeAFTOutliers: Optional[List[str]] = None,excludeAFTSamplesRegression: Optional[List[str]] = None, excludeAFTAliquotsRegression: Optional[List[str]] = None,
-    ZFTRegression: bool = False, ZFTRegressionColor: str = 'forestgreen', excludeZFTOutliers: Optional[List[str]] = None,excludeZFTSamplesRegression: Optional[List[str]] = None, excludeZFTAliquotsRegression: Optional[List[str]] = None,
-    savefig: bool = False, savefigFileName: Optional[str] = None, saveFolder: str = 'Plots'
-    ) -> None:
+def plot_AgeVersus_wZoomIn(samples: pd.DataFrame, 
+                                   aliquots: pd.DataFrame, 
+                                   transect: Optional[str], 
+                                   y_variable: str,
+                                   inset_xlim: Tuple[float, float], 
+                                   full_x_bounds: Optional[Tuple[float, float]] = None, 
+                                   y_bounds: Optional[Tuple[float, float]] = None,
+                                   inset_x_interval: int = 10, 
+                                   full_x_interval: int = 50,
+                                   weightedBy : str = 'unweighted', 
+                                   plot_SE: bool = False, 
+                                   SE_basedOn: str = 'max',
+                                   label_samples: bool = True, 
+                                   label_offset: Tuple[int, int] = (5, 5),
+                                   AHeColor: str = 'cadetblue', 
+                                   AHeMarker: str = 'h',
+                                   AHeMarkerSize: int = 12,
+                                   ZHeColor: str = 'darkmagenta',
+                                   ZHeMarker: str = 'D',
+                                   ZHeMarkerSize: int = 10,
+                                   AFTColor: str = 'gray',
+                                   AFTMarker: str = '^',
+                                   AFTMarkerSize: int = 12,
+                                   ZFTColor: str = 'forestgreen',
+                                   ZFTMarker: str = 'o',
+                                   ZFTMarkerSize: int = 12,
+                                   AHe_regression: bool = False, 
+                                   AHeRegressionColor: str = 'cadetblue', 
+                                   excludeAHeOutliers: Optional[List[str]] = None,
+                                   excludeAHeSamplesRegression: Optional[List[str]] = None, 
+                                   excludeAHeAliquotsRegression: Optional[List[str]] = None,
+                                   ZHe_regression: bool = False, 
+                                   ZHeRegressionColor: str = 'darkmagenta', 
+                                   excludeZHeOutliers: Optional[List[str]] = None,
+                                   excludeZHeSamplesRegression: Optional[List[str]] = None, 
+                                   excludeZHeAliquotsRegression: Optional[List[str]] = None,
+                                   AFTRegression: bool = False, 
+                                   AFTRegressionColor: str = 'gainsboro', 
+                                   excludeAFTOutliers: Optional[List[str]] = None,
+                                   excludeAFTSamplesRegression: Optional[List[str]] = None, 
+                                   excludeAFTAliquotsRegression: Optional[List[str]] = None,
+                                   ZFTRegression: bool = False, 
+                                   ZFTRegressionColor: str = 'forestgreen', 
+                                   excludeZFTOutliers: Optional[List[str]] = None,
+                                   excludeZFTSamplesRegression: Optional[List[str]] = None, 
+                                   excludeZFTAliquotsRegression: Optional[List[str]] = None,
+                                   savefig: bool = False, 
+                                   savefigFileName: Optional[str] = None, 
+                                   saveFolder: str = 'Plots') -> None:
     """
     Plots Cooling Age against a specified y-axis variable (e.g., Latitude, Longitude, Elevation, Structural Level),
     with an inset zoom and regression options for each mineral type.
@@ -2108,7 +2442,7 @@ def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame
     full_x_interval : int, default 50
         Interval for x-ticks in the full plot.
     weightedBy : str, default='unweighted'
-        Specifies the weighting method, with options such as 'unweighted'.
+        Specifies the weighting method, with options 'unweighted', 'inverse_variance' or 'relative_deviation'.
     plot_SE : bool, default=False
         Whether to plot standard error bars.
     SE_basedOn : str, default='max'
@@ -2208,36 +2542,43 @@ def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame
     # Set up figure and axes
     fig, (ax1, ax2) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1, 4]}, figsize=(12, 6), sharey=True)
 
+    # Specify plot orientation for regression function
+    age_on_x_axis = True
+
     # Regression for each chronometer
     if AHe_regression:
-        ahe_regression_df = filter_regression_data(full_aliquot_df, 'AHe', excludeAHeOutliers, excludeAHeSamplesRegression, excludeAHeAliquotsRegression)
-        plot_regression(ax1, ahe_regression_df, plot_data, y_variable, AHeRegressionColor, 'AHe', weightedBy)
-        plot_regression(ax2, ahe_regression_df, plot_data, y_variable, AHeRegressionColor, 'AHe', weightedBy)
+        ahe_regression_df = _filter_regression_data(full_aliquot_df, 'AHe', excludeAHeOutliers, excludeAHeSamplesRegression, excludeAHeAliquotsRegression)
+        ahe_regression_sample_df = _filter_regression_data(plot_data, 'AHe', False, excludeAHeSamplesRegression, None)
+
+        _plot_regression(ax1, ahe_regression_df, ahe_regression_sample_df, y_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
+        _plot_regression(ax2, ahe_regression_df, ahe_regression_sample_df, y_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
 
     if ZHe_regression:
-        zhe_regression_df = filter_regression_data(full_aliquot_df, 'ZHe', excludeZHeOutliers, excludeZHeSamplesRegression, excludeZHeAliquotsRegression)
-        plot_regression(ax1, zhe_regression_df, plot_data, y_variable, ZHeRegressionColor, 'ZHe', weightedBy)
-        plot_regression(ax2, zhe_regression_df, plot_data, y_variable, ZHeRegressionColor, 'ZHe', weightedBy)
+        zhe_regression_df = _filter_regression_data(full_aliquot_df, 'ZHe', excludeZHeOutliers, excludeZHeSamplesRegression, excludeZHeAliquotsRegression)
+        zhe_regression_sample_df = _filter_regression_data(plot_data, 'ZHe', False, excludeZHeSamplesRegression, None)
+
+        _plot_regression(ax1, zhe_regression_df, zhe_regression_sample_df, y_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
+        _plot_regression(ax2, zhe_regression_df, zhe_regression_sample_df, y_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
 
     if AFTRegression:
-        aft_regression_df = filter_regression_data(full_aliquot_df, 'AFT', excludeAFTOutliers, excludeAFTSamplesRegression, excludeAFTAliquotsRegression)
-        plot_regression(ax1, aft_regression_df, plot_data, y_variable, AFTRegressionColor, 'AFT', weightedBy)
-        plot_regression(ax2, aft_regression_df, plot_data, y_variable, AFTRegressionColor, 'AFT', weightedBy)
+        aft_regression_df = _filter_regression_data(full_aliquot_df, 'AFT', excludeAFTOutliers, excludeAFTSamplesRegression, excludeAFTAliquotsRegression)
+        aft_regression_sample_df = _filter_regression_data(plot_data, 'AFT', False, excludeAFTSamplesRegression, None)
+
+        _plot_regression(ax1, aft_regression_df, aft_regression_sample_df, y_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
+        _plot_regression(ax2, aft_regression_df, aft_regression_sample_df, y_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
 
     if ZFTRegression:
-        zft_regression_df = filter_regression_data(full_aliquot_df, 'ZFT', excludeZFTOutliers, excludeZFTSamplesRegression, excludeZFTAliquotsRegression)
-        plot_regression(ax1, zft_regression_df, plot_data, y_variable, ZFTRegressionColor, 'ZFT', weightedBy)
-        plot_regression(ax2, zft_regression_df, plot_data, y_variable, ZFTRegressionColor, 'ZFT', weightedBy)
+        zft_regression_df = _filter_regression_data(full_aliquot_df, 'ZFT', excludeZFTOutliers, excludeZFTSamplesRegression, excludeZFTAliquotsRegression)
+        zft_regression_sample_df = _filter_regression_data(plot_data, 'ZFT', False, excludeZFTSamplesRegression, None)
+
+        _plot_regression(ax1, zft_regression_df, zft_regression_sample_df, y_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
+        _plot_regression(ax2, zft_regression_df, zft_regression_sample_df, y_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
 
     # Plot data points
     outlier_markers = {'keep': 'o', 'reject': 'X'}
     colors = {'keep': 'black', 'reject': 'gray'}
     mineral_markers = {'AHe': AHeMarker, 'ZHe': ZHeMarker, 'AFT': AFTMarker, 'ZFT': ZFTMarker}
     
-    # for ax in [ax1, ax2]:
-    #     for outlier, marker in outlier_markers.items():
-    #         df = full_aliquot_df[full_aliquot_df['outlier'] == outlier]
-    #         ax.scatter(df['Corrected_Date_Ma'], df[y_variable], marker=marker, color=colors[outlier])
     for ax in [ax1, ax2]:
         # Plot rejected data points with X markers
         rejected_df = full_aliquot_df[full_aliquot_df['outlier'] == 'reject']
@@ -2520,23 +2861,53 @@ def plot_AgeVersus_wZoomRegression(samples: pd.DataFrame, aliquots: pd.DataFrame
 
     plt.show()
 
-def plot_AgeVersus_wZoomRegressionHistogram(samples: pd.DataFrame, aliquots: pd.DataFrame, transect: Optional[str], y_variable: str,
-    inset_xlim: Tuple[float, float], x_interval_inset: int = 10, full_x_interval: int = 50, 
-    full_x_bounds: Optional[Tuple[float, float]] = None, y_bounds: Optional[Tuple[float, float]] = None,
-    weightedBy: str = 'unweighted', plot_SE: bool = False, SE_basedOn: str = 'max',
-    insetBinWidth: int = 2, fullBinWidth: int = 5,
-    stat: str = 'count', kde: bool = True, histLegend: bool = True,
-    AHeColor: str = 'cornflowerblue', AHeMarker: str = 'h', AHeMarkerSize: int = 10,
-    ZHeColor: str = 'firebrick', ZHeMarker: str = 'D', ZHeMarkerSize: int = 8,
-    AFTColor: str = 'gray', AFTMarker: str = '^', AFTMarkerSize: int = 12,
-    ZFTColor: str = 'forestgreen', ZFTMarker: str = 'o', ZFTMarkerSize: int = 12,
-    AHe_regression: bool = False, AHeRegressionColor: str = 'lightsteelblue', excludeAHeSamples: Optional[List[str]] = None,
-    ZHe_regression: bool = False, ZHeRegressionColor: str = 'thistle', excludeZHeSamples: Optional[List[str]] = None,
-    AFTRegression: bool = False, AFTRegressionColor: str = 'gainsboro', excludeAFTSamples: Optional[List[str]] = None,
-    ZFTRegression: bool = False, ZFTRegressionColor: str = 'lightgreen', excludeZFTSamples: Optional[List[str]] = None,
-    label_transects: bool = False, separateZrLabels: bool = False, plotDepoAges: bool = False,
-    savefig: bool = False, savefigFileName: Optional[str] = None, saveFolder: str = 'Plots'
-    ) -> None:
+def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame, 
+                                            aliquots: pd.DataFrame, 
+                                            transect: Optional[str], 
+                                            y_variable: str,
+                                            inset_xlim: Tuple[float, float], 
+                                            x_interval_inset: int = 10, 
+                                            full_x_interval: int = 50, 
+                                            full_x_bounds: Optional[Tuple[float, float]] = None, 
+                                            y_bounds: Optional[Tuple[float, float]] = None,
+                                            weightedBy: str = 'unweighted', 
+                                            plot_SE: bool = False, 
+                                            SE_basedOn: str = 'max',
+                                            insetBinWidth: int = 2, 
+                                            fullBinWidth: int = 5,
+                                            stat: str = 'count', 
+                                            kde: bool = True, 
+                                            histLegend: bool = True,
+                                            AHeColor: str = 'cornflowerblue', 
+                                            AHeMarker: str = 'h', 
+                                            AHeMarkerSize: int = 10,
+                                            ZHeColor: str = 'firebrick', 
+                                            ZHeMarker: str = 'D', 
+                                            ZHeMarkerSize: int = 8,
+                                            AFTColor: str = 'gray', 
+                                            AFTMarker: str = '^', 
+                                            AFTMarkerSize: int = 12,
+                                            ZFTColor: str = 'forestgreen', 
+                                            ZFTMarker: str = 'o', 
+                                            ZFTMarkerSize: int = 12,
+                                            AHe_regression: bool = False, 
+                                            AHeRegressionColor: str = 'lightsteelblue', 
+                                            excludeAHeSamples: Optional[List[str]] = None,
+                                            ZHe_regression: bool = False, 
+                                            ZHeRegressionColor: str = 'thistle', 
+                                            excludeZHeSamples: Optional[List[str]] = None,
+                                            AFTRegression: bool = False, 
+                                            AFTRegressionColor: str = 'gainsboro', 
+                                            excludeAFTSamples: Optional[List[str]] = None,
+                                            ZFTRegression: bool = False, 
+                                            ZFTRegressionColor: str = 'lightgreen', 
+                                            excludeZFTSamples: Optional[List[str]] = None,
+                                            label_transects: bool = False, 
+                                            separateZrLabels: bool = False, 
+                                            plotDepoAges: bool = False,
+                                            savefig: bool = False, 
+                                            savefigFileName: Optional[str] = None, 
+                                            saveFolder: str = 'Plots') -> None:
     """
     Plots Cooling Age against a specified y-axis variable (e.g., Latitude, Longitude, Elevation, Structural Level),
     with an inset zoom, regression options for each mineral type, and a histogram of aliquot cooling ages for each mineral type
@@ -2564,7 +2935,7 @@ def plot_AgeVersus_wZoomRegressionHistogram(samples: pd.DataFrame, aliquots: pd.
     y_bounds : tuple of float, optional
         y-axis limits for the plot. If None, defaults to auto-scaling.
     weightedBy : str, default='unweighted'
-        Specifies the weighting method, with options such as 'unweighted'.
+        Specifies the weighting method, with options 'unweighted', 'inverse_variance' or 'relative_deviation'.
     plot_SE : bool, default=False
         Whether to plot standard error bars.
     SE_basedOn : str, default='max'
@@ -2676,26 +3047,37 @@ def plot_AgeVersus_wZoomRegressionHistogram(samples: pd.DataFrame, aliquots: pd.
                 palette=hist_colors, alpha = 0.8,
                 stat = stat, binwidth = fullBinWidth, kde = kde, legend = histLegend)
     
+    # Specify plot orientation for regression function
+    age_on_x_axis = True
+
     # Regression for each chronometer
     if AHe_regression:
-        ahe_regression_df = filter_regression_data(full_aliquot_df, 'AHe', True, excludeAHeSamples, None)
-        plot_regression(ax3, ahe_regression_df, plot_data, y_variable, AHeRegressionColor, 'AHe', weightedBy)
-        plot_regression(ax4, ahe_regression_df, plot_data, y_variable, AHeRegressionColor, 'AHe', weightedBy)
+        ahe_regression_df = _filter_regression_data(full_aliquot_df, 'AHe', False, excludeAHeSamples, None)
+        ahe_regression_sample_df = _filter_regression_data(plot_data, 'AHe', False, excludeAHeSamples, None)
+
+        _plot_regression(ax3, ahe_regression_df, ahe_regression_sample_df, y_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
+        _plot_regression(ax4, ahe_regression_df, ahe_regression_sample_df, y_variable, AHeRegressionColor, 'AHe', weightedBy, age_on_x_axis)
 
     if ZHe_regression:
-        zhe_regression_df = filter_regression_data(full_aliquot_df, 'ZHe', True, excludeZHeSamples, None)
-        plot_regression(ax3, zhe_regression_df, plot_data, y_variable, ZHeRegressionColor, 'ZHe', weightedBy)
-        plot_regression(ax4, zhe_regression_df, plot_data, y_variable, ZHeRegressionColor, 'ZHe', weightedBy)
+        zhe_regression_df = _filter_regression_data(full_aliquot_df, 'ZHe', False, excludeZHeSamples, None)
+        zhe_regression_sample_df = _filter_regression_data(plot_data, 'ZHe', False, excludeZHeSamples, None)
+
+        _plot_regression(ax3, zhe_regression_df, zhe_regression_sample_df, y_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
+        _plot_regression(ax4, zhe_regression_df, zhe_regression_sample_df, y_variable, ZHeRegressionColor, 'ZHe', weightedBy, age_on_x_axis)
 
     if AFTRegression:
-        aft_regression_df = filter_regression_data(full_aliquot_df, 'AFT', True, excludeAFTSamples, None)
-        plot_regression(ax3, aft_regression_df, plot_data, y_variable, AFTRegressionColor, 'AFT', weightedBy)
-        plot_regression(ax4, aft_regression_df, plot_data, y_variable, AFTRegressionColor, 'AFT', weightedBy)
+        aft_regression_df = _filter_regression_data(full_aliquot_df, 'AFT', False, excludeAFTSamples, None)
+        aft_regression_sample_df = _filter_regression_data(plot_data, 'AFT', False, excludeAFTSamples, None)
+
+        _plot_regression(ax3, aft_regression_df, aft_regression_sample_df, y_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
+        _plot_regression(ax4, aft_regression_df, aft_regression_sample_df, y_variable, AFTRegressionColor, 'AFT', weightedBy, age_on_x_axis)
 
     if ZFTRegression:
-        zft_regression_df = filter_regression_data(full_aliquot_df, 'ZFT', True, excludeZFTSamples, None)
-        plot_regression(ax3, zft_regression_df, plot_data, y_variable, ZFTRegressionColor, 'ZFT', weightedBy)
-        plot_regression(ax4, zft_regression_df, plot_data, y_variable, ZFTRegressionColor, 'ZFT', weightedBy)
+        zft_regression_df = _filter_regression_data(full_aliquot_df, 'ZFT', False, excludeZFTSamples, None)
+        zft_regression_sample_df = _filter_regression_data(plot_data, 'ZFT', False, excludeZFTSamples, None)
+
+        _plot_regression(ax3, zft_regression_df, zft_regression_sample_df, y_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
+        _plot_regression(ax4, zft_regression_df, zft_regression_sample_df, y_variable, ZFTRegressionColor, 'ZFT', weightedBy, age_on_x_axis)
 
     # Define marker and color mappings
     outlier_markers = {'keep':'o','reject':'X'}
@@ -3008,19 +3390,19 @@ def plot_AgeVersus_wZoomRegressionHistogram(samples: pd.DataFrame, aliquots: pd.
     plt.show();
 
 def plotSampleMapInteractive(samples: pd.DataFrame, 
-    transect: Optional[str] = None,
-    center: Optional[Tuple[float, float]] = None,
-    zoom_start: int = 10,
-    AHeColor: str = '#800080',  # darkmagenta in hex
-    ZHeColor: str = '#5f9ea0',  # cadetblue in hex
-    AFTColor: str = '#808080',  # gray in hex
-    ZFTColor: str = '#228b22',  # forestgreen in hex
-    tiles: str = 'OpenTopoMap',
-    include_terrain: bool = True,
-    include_satellite: bool = True,
-    save_html: bool = False,
-    filename: str = 'sample_map.html',
-    saveFolder: str = 'Plots') -> folium.Map:
+                            transect: Optional[str] = None,
+                            center: Optional[Tuple[float, float]] = None,
+                            zoom_start: int = 10,
+                            AHeColor: str = '#800080',  # darkmagenta in hex
+                            ZHeColor: str = '#5f9ea0',  # cadetblue in hex
+                            AFTColor: str = '#808080',  # gray in hex
+                            ZFTColor: str = '#228b22',  # forestgreen in hex
+                            tiles: str = 'OpenTopoMap',
+                            include_terrain: bool = True,
+                            include_satellite: bool = True,
+                            save_html: bool = False,
+                            filename: str = 'sample_map.html',
+                            saveFolder: str = 'Plots') -> folium.Map:
     """
     Creates an interactive map showing sample locations using Folium.
 
