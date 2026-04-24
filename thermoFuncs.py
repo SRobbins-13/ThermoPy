@@ -688,9 +688,19 @@ def plot_samples_eU_Rft(sample_list: List[str],
     -----
     - `radius` must be specified as either 'Rft' or 'Rs' to indicate the appropriate radius column.
     - Plots generated follow the layout of Figure 4 from Flowers et al., 2022, enabling easy comparison to published data.
+    - If a sample in `sample_list` is missing the specified `radius` column entirely or has no valid (non-NaN) values
+      for that column, it will be skipped. A summary of all skipped samples and the reason is printed after plotting.
     """
+    skipped_samples = []
+
     for sample in sample_list:
         grain_df = aliquots[aliquots.Sample == sample]
+
+        # Skip sample if the radius column doesn't exist or has no valid data for this sample
+        if radius not in grain_df.columns or grain_df[radius].isna().all():
+            skipped_samples.append(sample)
+            continue
+
         (mineral,) = (set(grain_df.Mineral.to_list()))
 
         if mineral.upper() == 'ZHE':
@@ -790,6 +800,10 @@ def plot_samples_eU_Rft(sample_list: List[str],
             plt.savefig(filepath, dpi='figure', bbox_inches='tight', pad_inches=0.5)
 
         plt.show();
+    
+    if skipped_samples:
+        print(f"\nNote: The following sample(s) were skipped because '{radius}' data is missing or absent:\n"
+              + "\n".join(f"  - {s}" for s in skipped_samples))
 
 def _confidence_intervals(aliquotData: pd.DataFrame, 
                          sampleData: pd.DataFrame, 
@@ -1001,6 +1015,7 @@ def _plot_regression(ax: Axes, aliquot_df: pd.DataFrame, sample_df: pd.DataFrame
             ax.fill_between(p_x, lower, upper, color=color, alpha=0.3)
 
 def plotElevationProfile(samples: pd.DataFrame, 
+                         figure_size: Tuple[float, float], 
                          x_variable: str, 
                          transect: Optional[str] = None, 
                          colorBy: Optional[str] = None,
@@ -1031,6 +1046,8 @@ def plotElevationProfile(samples: pd.DataFrame,
     ----------
     samples : pd.DataFrame
         Dataframe containing sample data with columns for Longitude, Elevation_m, Transect, Mineral, Sample, and other relevant details.
+    figure_size : [Tuple[float, float]]
+        Manually set the figure size of the plot.
     x_variable : str
         Specific X-variable to plot.
     transect : Optional[str]
@@ -1089,7 +1106,7 @@ def plotElevationProfile(samples: pd.DataFrame,
     plot_data = samples[samples['Transect'] == transect] if transect else samples.copy()
     
     # Set up plot
-    fig, ax = plt.subplots(figsize=(15, 8))
+    fig, ax = plt.subplots(figsize=figure_size)
 
     for row in plot_data.itertuples():
         if colorBy == 'chronometer':
@@ -1183,6 +1200,7 @@ def plotElevationProfile(samples: pd.DataFrame,
 
 def plotAgeVersus(samples: pd.DataFrame, 
                   aliquots: pd.DataFrame, 
+                  figure_size: Tuple[float, float],
                   x_variable: str, 
                   y_variable: str,
                   transect: Optional[str] = None,
@@ -1241,6 +1259,8 @@ def plotAgeVersus(samples: pd.DataFrame,
         Dataframe containing sample data with columns for Longitude, Elevation_m, Transect, Mineral, Sample, and other relevant details.
     aliquots : pd.DataFrame
         DataFrame containing aliquot data indexed by aliquot name, where multiple aliquots may correspond to a single sample.
+    figure_size : [Tuple[float, float]]
+        Manually set the figure size of the plot.
     x_variable : str
         Specific X-variable to plot.
     y_variable : str
@@ -1349,7 +1369,7 @@ def plotAgeVersus(samples: pd.DataFrame,
     full_aliquot_df = full_aliquot_df[full_aliquot_df['Transect'] == transect] if transect else full_aliquot_df
 
     # Figure Set up 
-    fig, ax = plt.subplots(figsize=(15, 8))
+    fig, ax = plt.subplots(figsize=figure_size)
     
     outlier_markers = {'keep': 'o', 'reject': 'X'}
     colors = {'keep': 'black', 'reject': 'gray'}
@@ -1755,6 +1775,7 @@ def plotAgeVersus(samples: pd.DataFrame,
 
 def plotAgeVersus_wHistogram(samples: pd.DataFrame, 
                              aliquots: pd.DataFrame, 
+                             figure_size: Tuple[float, float],
                              x_variable: str, 
                              y_variable: str,
                              transect: Optional[str] = None,
@@ -1814,6 +1835,8 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
         Dataframe containing sample data with columns for Longitude, Elevation_m, Transect, Mineral, Sample, and other relevant details.
     aliquots : pd.DataFrame
         DataFrame containing aliquot data indexed by aliquot name, where multiple aliquots may correspond to a single sample.
+    figure_size : [Tuple[float, float]]
+        Manually set the figure size of the plot.
     x_variable : str
         Specific X-variable to plot.
     y_variable : str
@@ -1951,7 +1974,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
     ## Orient the histogram plot correctly to correspond with 'Age' axis
     # Age on the x-axis
     if x_variable == 'Age':
-        fig, (ax1,ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 8]}, figsize = (15,8), sharex = True)
+        fig, (ax1,ax2) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [2, 8]}, figsize = figure_size, sharex = True)
 
         ## Plotting Age Histogram (Axis 1) -----------------------------
         if y_bounds:
@@ -2152,7 +2175,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
     ## --------------------------------------------------------------------------------------------------------------------------------
     # Age on the y-axis
     elif y_variable == 'Age':
-        fig, (ax1,ax2) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1, 8]}, figsize = (12,6), sharey = True)
+        fig, (ax1,ax2) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1, 8]}, figsize = figure_size, sharey = True)
 
         ## Plotting Age Histogram (Axis 1) 
         if x_bounds:
@@ -2368,6 +2391,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
 
 def plot_AgeVersus_wZoomIn(samples: pd.DataFrame, 
                                    aliquots: pd.DataFrame, 
+                                   figure_size: Tuple[float, float],
                                    transect: Optional[str], 
                                    y_variable: str,
                                    inset_xlim: Tuple[float, float], 
@@ -2427,6 +2451,8 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
         DataFrame containing sample data and summary statistics, indexed by sample name.
     aliquots : pd.DataFrame
         DataFrame containing aliquot data, indexed by aliquot name. Each sample may have multiple aliquots.
+    figure_size : [Tuple[float, float]]
+        Manually set the figure size of the plot.
     transect : str, optional
         Specific transect to plot. If None, the full dataset is plotted.
     y_variable : str
@@ -2540,7 +2566,7 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
     full_aliquot_df = full_aliquot_df[full_aliquot_df['Transect'] == transect] if transect else full_aliquot_df
 
     # Set up figure and axes
-    fig, (ax1, ax2) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1, 4]}, figsize=(12, 6), sharey=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [1, 4]}, figsize=figure_size, sharey=True)
 
     # Specify plot orientation for regression function
     age_on_x_axis = True
@@ -2863,6 +2889,7 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
 
 def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame, 
                                             aliquots: pd.DataFrame, 
+                                            figure_size: Tuple[float, float],
                                             transect: Optional[str], 
                                             y_variable: str,
                                             inset_xlim: Tuple[float, float], 
@@ -2920,6 +2947,8 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
         DataFrame containing sample data and summary statistics, indexed by sample name.
     aliquots : pd.DataFrame
         DataFrame containing aliquot data, indexed by aliquot name. Each sample may have multiple aliquots.
+    figure_size : [Tuple[float, float]]
+        Manually set the figure size of the plot.
     transect : str, optional
         Specific transect to plot. If None, the full dataset is plotted.
     y_variable : str
@@ -3032,7 +3061,7 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
     
     # Figure Set Up 
     fig, ((ax1,ax2),(ax3,ax4)) = plt.subplots(2, 2, gridspec_kw={'width_ratios': [1, 4], 'height_ratios':[2,5]}, 
-                                          figsize = (12,8), sharex = 'col', sharey = 'row')
+                                          figsize = figure_size, sharex = 'col', sharey = 'row')
     
     # Histogram of cooling ages
     hist_colors = {'ZHe': ZHeColor,'AHe': AHeColor, 'AFT': AFTColor, 'ZFT': ZFTColor}
