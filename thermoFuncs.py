@@ -1023,16 +1023,16 @@ def plotElevationProfile(samples: pd.DataFrame,
                          y_bounds: Optional[Tuple[float, float]] = None,
                          label_samples: bool = True, 
                          label_offset: Tuple[float, float] = (0, 0),
-                         AHeColor: str = 'darkmagenta', 
+                         AHeColor: str = 'deepskyblue', 
                          AHeMarker: str = 'h', 
                          AHeMarkerSize: int = 12,
-                         ZHeColor: str = 'cadetblue', 
+                         ZHeColor: str = 'firebrick', 
                          ZHeMarker: str = 'D', 
                          ZHeMarkerSize: int = 10,
-                         AFTColor: str = 'gray', 
+                         AFTColor: str = 'mediumseagreen', 
                          AFTMarker: str = '^', 
                          AFTMarkerSize: int = 10,
-                         ZFTColor: str = 'forestgreen', 
+                         ZFTColor: str = 'darkgrey', 
                          ZFTMarker: str = 'o', 
                          ZFTMarkerSize: int = 10, 
                          savefig: bool = False, 
@@ -1063,25 +1063,25 @@ def plotElevationProfile(samples: pd.DataFrame,
     label_offset : tuple, optional
         Offset for sample labels (x, y); default is (0, 0).
     AHeColor : str, optional
-        Color for the AHe marker; default is 'darkmagenta'.
+        Color for the AHe marker; default is 'deepskyblue'.
     AHeMarker : str, optional
         Style for the AHe marker; default is 'h'.
     AHeMarkerSize : int, optional
         Size for the AHe marker; default is 12.
     ZHeColor : str, optional
-        Color for the ZHe marker; default is 'cadetblue'.
+        Color for the ZHe marker; default is 'firebrick'.
     ZHeMarker : str, optional
         Style for the ZHe marker; default is 'D'.
     ZHeMarkerSize : int, optional
         Size for the ZHe marker; default is 10.
     AFTColor : str, optional
-        Color for the AFT marker; default is 'gray'.
+        Color for the AFT marker; default is 'mediumseagreen'.
     AFTMarker : str, optional
         Style for the AFT marker; default is '^'.
     AFTMarkerSize : int, optional
         Size for the AFT marker; default is 10.
     ZFTColor : str, optional
-        Color for the ZFT marker; default is 'forestgreen'.
+        Color for the ZFT marker; default is 'darkgrey'.
     ZFTMarker : str, optional
         Style for the ZFT marker; default is 'o'.
     ZFTMarkerSize : int, optional
@@ -1212,16 +1212,16 @@ def plotAgeVersus(samples: pd.DataFrame,
                   y_bounds: Optional[Tuple[float, float]] = None,
                   label_samples: bool = True, 
                   label_offset: Tuple[float, float] = (0, 0), 
-                  AHeColor: str = 'darkmagenta', 
+                  AHeColor: str = 'deepskyblue', 
                   AHeMarker: str = 'h', 
                   AHeMarkerSize: int = 12,
-                  ZHeColor: str = 'cadetblue', 
+                  ZHeColor: str = 'firebrick', 
                   ZHeMarker: str = 'D', 
                   ZHeMarkerSize: int = 10,
-                  AFTColor: str = 'gray', 
+                  AFTColor: str = 'mediumseagreen', 
                   AFTMarker: str = '^', 
                   AFTMarkerSize: int = 10,
-                  ZFTColor: str = 'forestgreen', 
+                  ZFTColor: str = 'darkgrey', 
                   ZFTMarker: str = 'o', 
                   ZFTMarkerSize: int = 10,
                   AHe_regression: bool = False, 
@@ -1235,15 +1235,16 @@ def plotAgeVersus(samples: pd.DataFrame,
                   excludeZHeSamplesRegression: Optional[List[str]] = None, 
                   excludeZHeAliquotsRegression: Optional[List[str]] = None,
                   AFTRegression: bool = False, 
-                  AFTRegressionColor: str = 'gainsboro', 
+                  AFTRegressionColor: str = 'forestgreen', 
                   excludeAFTOutliers: Optional[List[str]] = None,
                   excludeAFTSamplesRegression: Optional[List[str]] = None, 
                   excludeAFTAliquotsRegression: Optional[List[str]] = None,
                   ZFTRegression: bool = False, 
-                  ZFTRegressionColor: str = 'forestgreen', 
+                  ZFTRegressionColor: str = 'gainsboro', 
                   excludeZFTOutliers: Optional[List[str]] = None,
                   excludeZFTSamplesRegression: Optional[List[str]] = None, 
                   excludeZFTAliquotsRegression: Optional[List[str]] = None,
+                  plotDepoAges: bool = False, 
                   savefig: bool = False, 
                   savefigFileName: Optional[str] = None, 
                   saveFolder: str = 'Plots') -> None:
@@ -1284,25 +1285,25 @@ def plotAgeVersus(samples: pd.DataFrame,
     label_offset : tuple, optional
         Offset for sample labels (x, y); default is (0, 0).
     AHeColor : str, optional
-        Color for the AHe marker; default is 'darkmagenta'.
+        Color for the AHe marker; default is 'deepskyblue'.
     AHeMarker : str, optional
         Style for the AHe marker; default is 'h'.
     AHeMarkerSize : int, optional
         Size for the AHe marker; default is 12.
     ZHeColor : str, optional
-        Color for the ZHe marker; default is 'cadetblue'.
+        Color for the ZHe marker; default is 'firebrick'.
     ZHeMarker : str, optional
         Style for the ZHe marker; default is 'D'.
     ZHeMarkerSize : int, optional
         Size for the ZHe marker; default is 10.
     AFTColor : str, optional
-        Color for the AFT marker; default is 'gray'.
+        Color for the AFT marker; default is 'mediumseagreen'.
     AFTMarker : str, optional
         Style for the AFT marker; default is '^'.
     AFTMarkerSize : int, optional
         Size for the AFT marker; default is 10.
     ZFTColor : str, optional
-        Color for the ZFT marker; default is 'forestgreen'.
+        Color for the ZFT marker; default is 'darkgrey'.
     ZFTMarker : str, optional
         Style for the ZFT marker; default is 'o'.
     ZFTMarkerSize : int, optional
@@ -1329,7 +1330,7 @@ def plotAgeVersus(samples: pd.DataFrame,
         List of aliquots to exclude from ZHe regression.
     AFTRegression : bool, default False
         Whether to perform regression on AFT data points.
-    AFTRegressionColor : str, default 'gainsboro'
+    AFTRegressionColor : str, default 'forestgreen'
         Color for the AFT regression line and confidence intervals.
     excludeAFTOutliers : list of str, optional
         List of outliers to exclude from AFT regression.
@@ -1339,7 +1340,7 @@ def plotAgeVersus(samples: pd.DataFrame,
         List of aliquots to exclude from AFT regression.
     ZFTRegression : bool, default False
         Whether to perform regression on ZFT data points.
-    ZFTRegressionColor : str, default 'forestgreen'
+    ZFTRegressionColor : str, default 'gainsboro'
         Color for the ZFT regression line and confidence intervals.
     excludeZFTOutliers : list of str, optional
         List of outliers to exclude from ZFT regression.
@@ -1347,6 +1348,9 @@ def plotAgeVersus(samples: pd.DataFrame,
         List of samples to exclude from ZFT regression.
     excludeZFTAliquotsRegression : list of str, optional
         List of aliquots to exclude from ZFT regression.
+    plotDepoAges : bool, default=False
+        Whether to plot depositional age ranges as shaded boxes. Only applies when the
+        cooling age is plotted on the x-axis.
     savefig : bool, optional
         If True, saves the plot.
     savefigFileName : str, optional
@@ -1360,7 +1364,7 @@ def plotAgeVersus(samples: pd.DataFrame,
         Displays the plot; saves it if savefig is True.
     """
     # Set up data for plotting 
-    full_aliquot_df = pd.merge(aliquots,samples[['Mean','StDev','Latitude','Longitude','Elevation_m','Structural_Level', 'Transect']],
+    full_aliquot_df = pd.merge(aliquots,samples[['Mean','StDev','Latitude','Longitude','Elevation_m','Structural_Level','Transect']],
                      on = 'Sample', how = 'left')
 
     full_aliquot_df.set_index('Aliquot', inplace = True, drop = False)
@@ -1716,6 +1720,64 @@ def plotAgeVersus(samples: pd.DataFrame,
                                 weight = 'book',
                                 style = 'italic')
 
+        ### Depositional Ages
+        if plotDepoAges:
+            
+            depoAge_df = plot_data[['Sample','Transect','Mineral','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level',
+                                    'Depositional_Age_LB','Depositional_Age_UB']]
+            depoAge_df = depoAge_df.groupby(['Transect','Depositional_Age_LB',
+                                                'Depositional_Age_UB']).agg({'Latitude':['min','max'],
+                                                                            'Longitude':['min','max'],
+                                                                            'Elevation_m':['min','max'],
+                                                                            'Structural_Level':['min','max']}).reset_index()
+            depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
+            
+            # CURRENTLY ONLY WORKS FOR LATITUDE - ADD ANOTHER OPTION FOR ELEVATION
+            for index, row in depoAge_df.iterrows():
+                width = row['Depositional_Age_UB_'] - row['Depositional_Age_LB_']
+
+                if y_variable == 'Latitude':
+                    height = row['Latitude_max'] - row['Latitude_min']
+                    anchor_y = row['Latitude_min']
+                    
+                    # for transects that span small Latitude range
+                    if height < 0.15:
+                        height = 0.15
+
+                elif y_variable == 'Elevation_m':
+                    height = row['Elevation_m_max'] - row['Elevation_m_min']
+                    anchor_y = row['Elevation_m_min']
+                    
+                    # for transects that span small Elevation range
+                    if transect:
+                        if height < 20:
+                            height = 20
+                    else:
+                        if height < 50:
+                            height = 50
+                
+                elif y_variable == 'Structural_Level':
+                    height = row['Structural_Level_max'] - row['Structural_Level_min']
+                    anchor_y = row['Structural_Level_min']
+                    
+                    # for transects that span small Structural_Level range
+                    if transect:
+                        if height < 20:
+                            height = 20
+                    else:
+                        if height < 50:
+                            height = 50
+                
+                anchor_x = row['Depositional_Age_LB_']
+                
+                ax.add_patch(Rectangle((anchor_x,anchor_y),width,height,
+                                        edgecolor = 'k',
+                                        facecolor = 'whitesmoke',
+                                        fill=True,
+                                        alpha = 0.8,
+                                        hatch = '//',
+                                        zorder = 1000))
+
         ### Axes and Spine Customization -----------------------------
         ax.spines["left"].set_color('k')
         ax.spines["bottom"].set_color('k')
@@ -1788,16 +1850,16 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
                              label_samples: bool = True, 
                              label_offset: Tuple[float, float] = (0, 0), 
                              bin_width: int = 10,
-                             AHeColor: str = 'darkmagenta', 
+                             AHeColor: str = 'deepskyblue', 
                              AHeMarker: str = 'h', 
                              AHeMarkerSize: int = 12,
-                             ZHeColor: str = 'cadetblue', 
+                             ZHeColor: str = 'firebrick', 
                              ZHeMarker: str = 'D', 
                              ZHeMarkerSize: int = 10,
-                             AFTColor: str = 'gray', 
+                             AFTColor: str = 'mediumseagreen', 
                              AFTMarker: str = '^', 
                              AFTMarkerSize: int = 10,
-                             ZFTColor: str = 'forestgreen', 
+                             ZFTColor: str = 'darkgrey', 
                              ZFTMarker: str = 'o', 
                              ZFTMarkerSize: int = 10,
                              AHe_regression: bool = False, 
@@ -1811,15 +1873,16 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
                              excludeZHeSamplesRegression: Optional[List[str]] = None, 
                              excludeZHeAliquotsRegression: Optional[List[str]] = None,
                              AFTRegression: bool = False, 
-                             AFTRegressionColor: str = 'gainsboro', 
+                             AFTRegressionColor: str = 'forestgreen', 
                              excludeAFTOutliers: Optional[List[str]] = None,
                              excludeAFTSamplesRegression: Optional[List[str]] = None, 
                              excludeAFTAliquotsRegression: Optional[List[str]] = None,
                              ZFTRegression: bool = False, 
-                             ZFTRegressionColor: str = 'forestgreen', 
+                             ZFTRegressionColor: str = 'gainsboro', 
                              excludeZFTOutliers: Optional[List[str]] = None,
                              excludeZFTSamplesRegression: Optional[List[str]] = None, 
                              excludeZFTAliquotsRegression: Optional[List[str]] = None,
+                             plotDepoAges: bool = False,
                              savefig: bool = False, 
                              savefigFileName: Optional[str] = None, 
                              saveFolder: str = 'Plots') -> None:
@@ -1862,25 +1925,25 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
     bin_width : int, optional
         Bin width for the historgram; default is 10.
     AHeColor : str, optional
-        Color for the AHe marker; default is 'darkmagenta'.
+        Color for the AHe marker; default is 'deepskyblue'.
     AHeMarker : str, optional
         Style for the AHe marker; default is 'h'.
     AHeMarkerSize : int, optional
         Size for the AHe marker; default is 12.
     ZHeColor : str, optional
-        Color for the ZHe marker; default is 'cadetblue'.
+        Color for the ZHe marker; default is 'firebrick'.
     ZHeMarker : str, optional
         Style for the ZHe marker; default is 'D'.
     ZHeMarkerSize : int, optional
         Size for the ZHe marker; default is 10.
     AFTColor : str, optional
-        Color for the AFT marker; default is 'gray'.
+        Color for the AFT marker; default is 'mediumseagreen'.
     AFTMarker : str, optional
         Style for the AFT marker; default is '^'.
     AFTMarkerSize : int, optional
         Size for the AFT marker; default is 10.
     ZFTColor : str, optional
-        Color for the ZFT marker; default is 'forestgreen'.
+        Color for the ZFT marker; default is 'darkgrey'.
     ZFTMarker : str, optional
         Style for the ZFT marker; default is 'o'.
     ZFTMarkerSize : int, optional
@@ -1907,7 +1970,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
         List of aliquots to exclude from ZHe regression.
     AFTRegression : bool, default False
         Whether to perform regression on AFT data points.
-    AFTRegressionColor : str, default 'gainsboro'
+    AFTRegressionColor : str, default 'forestgreen'
         Color for the AFT regression line and confidence intervals.
     excludeAFTOutliers : list of str, optional
         List of outliers to exclude from AFT regression.
@@ -1917,7 +1980,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
         List of aliquots to exclude from AFT regression.
     ZFTRegression : bool, default False
         Whether to perform regression on ZFT data points.
-    ZFTRegressionColor : str, default 'forestgreen'
+    ZFTRegressionColor : str, default 'gainsboro'
         Color for the ZFT regression line and confidence intervals.
     excludeZFTOutliers : list of str, optional
         List of outliers to exclude from ZFT regression.
@@ -1925,6 +1988,9 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
         List of samples to exclude from ZFT regression.
     excludeZFTAliquotsRegression : list of str, optional
         List of aliquots to exclude from ZFT regression.
+    plotDepoAges : bool, default=False
+        Whether to plot depositional age ranges as shaded boxes. Only applies when the
+        cooling age is plotted on the x-axis.
     savefig : bool, optional
         If True, saves the plot.
     savefigFileName : str, optional
@@ -2127,6 +2193,63 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
                                 color = GREY60,
                                 weight = 'book',
                                 style = 'italic')
+        ### Depositional Ages
+        if plotDepoAges:
+            
+            depoAge_df = plot_data[['Sample','Transect','Mineral','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level',
+                                    'Depositional_Age_LB','Depositional_Age_UB']]
+            depoAge_df = depoAge_df.groupby(['Transect','Depositional_Age_LB',
+                                                'Depositional_Age_UB']).agg({'Latitude':['min','max'],
+                                                                            'Longitude':['min','max'],
+                                                                            'Elevation_m':['min','max'],
+                                                                            'Structural_Level':['min','max']}).reset_index()
+            depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
+            
+            # CURRENTLY ONLY WORKS FOR LATITUDE - ADD ANOTHER OPTION FOR ELEVATION
+            for index, row in depoAge_df.iterrows():
+                width = row['Depositional_Age_UB_'] - row['Depositional_Age_LB_']
+
+                if y_variable == 'Latitude':
+                    height = row['Latitude_max'] - row['Latitude_min']
+                    anchor_y = row['Latitude_min']
+                    
+                    # for transects that span small Latitude range
+                    if height < 0.15:
+                        height = 0.15
+
+                elif y_variable == 'Elevation_m':
+                    height = row['Elevation_m_max'] - row['Elevation_m_min']
+                    anchor_y = row['Elevation_m_min']
+                    
+                    # for transects that span small Elevation range
+                    if transect:
+                        if height < 20:
+                            height = 20
+                    else:
+                        if height < 50:
+                            height = 50
+                
+                elif y_variable == 'Structural_Level':
+                    height = row['Structural_Level_max'] - row['Structural_Level_min']
+                    anchor_y = row['Structural_Level_min']
+                    
+                    # for transects that span small Structural_Level range
+                    if transect:
+                        if height < 20:
+                            height = 20
+                    else:
+                        if height < 50:
+                            height = 50
+                
+                anchor_x = row['Depositional_Age_LB_']
+                
+                ax2.add_patch(Rectangle((anchor_x,anchor_y),width,height,
+                                        edgecolor = 'k',
+                                        facecolor = 'whitesmoke',
+                                        fill=True,
+                                        alpha = 0.8,
+                                        hatch = '//',
+                                        zorder = 1000))
         ##########################
         ### Axes and Spine Customization ----------------------------- 
         ax2.spines["left"].set_color('k')
@@ -2404,16 +2527,16 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
                                    SE_basedOn: str = 'max',
                                    label_samples: bool = True, 
                                    label_offset: Tuple[int, int] = (5, 5),
-                                   AHeColor: str = 'cadetblue', 
+                                   AHeColor: str = 'deepskyblue', 
                                    AHeMarker: str = 'h',
                                    AHeMarkerSize: int = 12,
-                                   ZHeColor: str = 'darkmagenta',
+                                   ZHeColor: str = 'firebrick',
                                    ZHeMarker: str = 'D',
                                    ZHeMarkerSize: int = 10,
-                                   AFTColor: str = 'gray',
+                                   AFTColor: str = 'mediumseagreen',
                                    AFTMarker: str = '^',
                                    AFTMarkerSize: int = 12,
-                                   ZFTColor: str = 'forestgreen',
+                                   ZFTColor: str = 'darkgrey',
                                    ZFTMarker: str = 'o',
                                    ZFTMarkerSize: int = 12,
                                    AHe_regression: bool = False, 
@@ -2427,15 +2550,16 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
                                    excludeZHeSamplesRegression: Optional[List[str]] = None, 
                                    excludeZHeAliquotsRegression: Optional[List[str]] = None,
                                    AFTRegression: bool = False, 
-                                   AFTRegressionColor: str = 'gainsboro', 
+                                   AFTRegressionColor: str = 'forestgreen', 
                                    excludeAFTOutliers: Optional[List[str]] = None,
                                    excludeAFTSamplesRegression: Optional[List[str]] = None, 
                                    excludeAFTAliquotsRegression: Optional[List[str]] = None,
                                    ZFTRegression: bool = False, 
-                                   ZFTRegressionColor: str = 'forestgreen', 
+                                   ZFTRegressionColor: str = 'gainsboro', 
                                    excludeZFTOutliers: Optional[List[str]] = None,
                                    excludeZFTSamplesRegression: Optional[List[str]] = None, 
                                    excludeZFTAliquotsRegression: Optional[List[str]] = None,
+                                   plotDepoAges: bool = False, 
                                    savefig: bool = False, 
                                    savefigFileName: Optional[str] = None, 
                                    saveFolder: str = 'Plots') -> None:
@@ -2477,25 +2601,25 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
         Whether to label sample points on the plot.
     label_offset : tuple of int, default (5, 5)
         Offset for sample labels to position them more clearly.
-    AHeColor : str, default 'cadetblue'
+    AHeColor : str, default 'deepskyblue'
         Color for Apatite He (AHe) markers.
     AHeMarker : str, default 'h'
         Marker style for AHe data points.
     AHeMarkerSize : int, default 12
         Marker size for AHe data points.
-    ZHeColor : str, default 'darkmagenta'
+    ZHeColor : str, default 'firebrick'
         Color for Zircon He (ZHe) markers.
     ZHeMarker : str, default 'D'
         Marker style for ZHe data points.
     ZHeMarkerSize : int, default 10
         Marker size for ZHe data points.
-    AFTColor : str, default 'gray'
+    AFTColor : str, default 'mediumseagreen'
         Color for Apatite Fission Track (AFT) markers.
     AFTMarker : str, default '^'
         Marker style for AFT data points.
     AFTMarkerSize : int, default 12
         Marker size for AFT data points.
-    ZFTColor : str, default 'forestgreen'
+    ZFTColor : str, default 'darkgrey'
         Color for Zircon Fission Track (ZFT) markers.
     ZFTMarker : str, default 'o'
         Marker style for ZFT data points.
@@ -2523,7 +2647,7 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
         List of aliquots to exclude from ZHe regression.
     AFTRegression : bool, default False
         Whether to perform regression on AFT data points.
-    AFTRegressionColor : str, default 'gainsboro'
+    AFTRegressionColor : str, default 'forestgreen'
         Color for the AFT regression line and confidence intervals.
     excludeAFTOutliers : list of str, optional
         List of outliers to exclude from AFT regression.
@@ -2533,7 +2657,7 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
         List of aliquots to exclude from AFT regression.
     ZFTRegression : bool, default False
         Whether to perform regression on ZFT data points.
-    ZFTRegressionColor : str, default 'forestgreen'
+    ZFTRegressionColor : str, default 'gainsboro'
         Color for the ZFT regression line and confidence intervals.
     excludeZFTOutliers : list of str, optional
         List of outliers to exclude from ZFT regression.
@@ -2541,6 +2665,9 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
         List of samples to exclude from ZFT regression.
     excludeZFTAliquotsRegression : list of str, optional
         List of aliquots to exclude from ZFT regression.
+    plotDepoAges : bool, default=False
+        Whether to plot depositional age ranges as shaded boxes. Only applies when the
+        cooling age is plotted on the x-axis.
     savefig : bool, default False
         Whether to save the generated plot to a file.
     savefigFileName : str, optional
@@ -2556,7 +2683,7 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
     # Merge sample and aliquot data for complete data set
     full_aliquot_df = pd.merge(
         aliquots,
-        samples[['Mean', 'StDev', 'Mean_w', 'StDev_w','Mean_rw', 'StDev_rw','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level', 'Transect']],
+        samples[['Mean', 'StDev', 'Mean_w', 'StDev_w','Mean_rw', 'StDev_rw','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level','Transect']],
         on='Sample',
         how='left'
     )
@@ -2764,6 +2891,63 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
                          color = GREY60,
                          weight = 'book',
                          style = 'italic')
+    ### Depositional Ages
+    if plotDepoAges:
+        
+        depoAge_df = plot_data[['Sample','Transect','Mineral','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level',
+                                'Depositional_Age_LB','Depositional_Age_UB']]
+        depoAge_df = depoAge_df.groupby(['Transect','Depositional_Age_LB',
+                                            'Depositional_Age_UB']).agg({'Latitude':['min','max'],
+                                                                        'Longitude':['min','max'],
+                                                                        'Elevation_m':['min','max'],
+                                                                        'Structural_Level':['min','max']}).reset_index()
+        depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
+        
+        # CURRENTLY ONLY WORKS FOR LATITUDE - ADD ANOTHER OPTION FOR ELEVATION
+        for index, row in depoAge_df.iterrows():
+            width = row['Depositional_Age_UB_'] - row['Depositional_Age_LB_']
+
+            if y_variable == 'Latitude':
+                height = row['Latitude_max'] - row['Latitude_min']
+                anchor_y = row['Latitude_min']
+                
+                # for transects that span small Latitude range
+                if height < 0.15:
+                    height = 0.15
+
+            elif y_variable == 'Elevation_m':
+                height = row['Elevation_m_max'] - row['Elevation_m_min']
+                anchor_y = row['Elevation_m_min']
+                
+                # for transects that span small Elevation range
+                if transect:
+                    if height < 20:
+                        height = 20
+                else:
+                    if height < 50:
+                        height = 50
+            
+            elif y_variable == 'Structural_Level':
+                height = row['Structural_Level_max'] - row['Structural_Level_min']
+                anchor_y = row['Structural_Level_min']
+                
+                # for transects that span small Structural_Level range
+                if transect:
+                    if height < 20:
+                        height = 20
+                else:
+                    if height < 50:
+                        height = 50
+            
+            anchor_x = row['Depositional_Age_LB_']
+            
+            ax2.add_patch(Rectangle((anchor_x,anchor_y),width,height,
+                                    edgecolor = 'k',
+                                    facecolor = 'whitesmoke',
+                                    fill=True,
+                                    alpha = 0.8,
+                                    hatch = '//',
+                                    zorder = 1000))
 
     ### Axes and Spine Customization -----------------------------
     ## Inset
@@ -2905,29 +3089,29 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
                                             stat: str = 'count', 
                                             kde: bool = True, 
                                             histLegend: bool = True,
-                                            AHeColor: str = 'cornflowerblue', 
+                                            AHeColor: str = 'deepskyblue', 
                                             AHeMarker: str = 'h', 
                                             AHeMarkerSize: int = 10,
                                             ZHeColor: str = 'firebrick', 
                                             ZHeMarker: str = 'D', 
                                             ZHeMarkerSize: int = 8,
-                                            AFTColor: str = 'gray', 
+                                            AFTColor: str = 'mediumseagreen', 
                                             AFTMarker: str = '^', 
                                             AFTMarkerSize: int = 12,
-                                            ZFTColor: str = 'forestgreen', 
+                                            ZFTColor: str = 'darkgrey', 
                                             ZFTMarker: str = 'o', 
                                             ZFTMarkerSize: int = 12,
                                             AHe_regression: bool = False, 
-                                            AHeRegressionColor: str = 'lightsteelblue', 
+                                            AHeRegressionColor: str = 'cadetblue', 
                                             excludeAHeSamples: Optional[List[str]] = None,
                                             ZHe_regression: bool = False, 
-                                            ZHeRegressionColor: str = 'thistle', 
+                                            ZHeRegressionColor: str = 'darkmagenta', 
                                             excludeZHeSamples: Optional[List[str]] = None,
                                             AFTRegression: bool = False, 
-                                            AFTRegressionColor: str = 'gainsboro', 
+                                            AFTRegressionColor: str = 'forestgreen', 
                                             excludeAFTSamples: Optional[List[str]] = None,
                                             ZFTRegression: bool = False, 
-                                            ZFTRegressionColor: str = 'lightgreen', 
+                                            ZFTRegressionColor: str = 'gainsboro', 
                                             excludeZFTSamples: Optional[List[str]] = None,
                                             label_transects: bool = False, 
                                             separateZrLabels: bool = False, 
@@ -2979,7 +3163,7 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
         Whether to overlay a kernel density estimate on the histogram.
     histLegend : bool, default=True
         Whether to display a legend for the histogram.
-    AHeColor : str, default='cornflowerblue'
+    AHeColor : str, default='deepskyblue'
         Color for AHe markers.
     AHeMarker : str, default='h'
         Marker style for AHe data points.
@@ -2991,13 +3175,13 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
         Marker style for ZHe data points.
     ZHeMarkerSize : int, default=8
         Size for ZHe markers.
-    AFTColor : str, default='gray'
+    AFTColor : str, default='mediumseagreen'
         Color for AFT markers.
     AFTMarker : str, default='^'
         Marker style for AFT data points.
     AFTMarkerSize : int, default=12
         Size for AFT markers.
-    ZFTColor : str, default='forestgreen'
+    ZFTColor : str, default='darkgrey'
         Color for ZFT markers.
     ZFTMarker : str, default='o'
         Marker style for ZFT data points.
@@ -3005,25 +3189,25 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
         Size for ZFT markers.
     AHe_regression : bool, default=False
         Whether to plot regression for AHe data.
-    AHeRegressionColor : str, default='lightsteelblue'
+    AHeRegressionColor : str, default='cadetblue'
         Color for the AHe regression line.
     excludeAHeSamples : list of str, optional
         Samples to exclude from AHe regression.
     ZHe_regression : bool, default=False
         Whether to plot regression for ZHe data.
-    ZHeRegressionColor : str, default='thistle'
+    ZHeRegressionColor : str, default='darkmagenta'
         Color for the ZHe regression line.
     excludeZHeSamples : list of str, optional
         Samples to exclude from ZHe regression.
     AFTRegression : bool, default=False
         Whether to plot regression for AFT data.
-    AFTRegressionColor : str, default='gainsboro'
+    AFTRegressionColor : str, default='forestgreen'
         Color for the AFT regression line.
     excludeAFTSamples : list of str, optional
         Samples to exclude from AFT regression.
     ZFTRegression : bool, default=False
         Whether to plot regression for ZFT data.
-    ZFTRegressionColor : str, default='lightgreen'
+    ZFTRegressionColor : str, default='gainsboro'
         Color for the ZFT regression line.
     excludeZFTSamples : list of str, optional
         Samples to exclude from ZFT regression.
@@ -3048,7 +3232,7 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
     # Merge sample and aliquot data for complete data set
     full_aliquot_df = pd.merge(
         aliquots,
-        samples[['Mean', 'StDev', 'Mean_w', 'StDev_w','Mean_rw', 'StDev_rw','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level', 'Transect']],
+        samples[['Mean', 'StDev', 'Mean_w', 'StDev_w','Mean_rw', 'StDev_rw','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level','Transect']],
         on='Sample',
         how='left'
     )
