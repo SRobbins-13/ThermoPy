@@ -39,6 +39,7 @@ from pathlib import Path
 # Typing Modules
 from typing import List, Tuple, Optional, Union
 import warnings
+import difflib
 
 sns.set(style='white')
 
@@ -99,6 +100,9 @@ def loadDataExcel(file_path: str, samples: str = 'Samples', aliquots: str = 'Ali
     aliquots = pd.read_excel(file_path, sheet_name = aliquots)
     aliquots.set_index('Aliquot', inplace = True, drop = False)
 
+     # Warn early (without stopping) if the two sheets don't link up
+    validateSampleAliquotLinks(samples, aliquots, sample_list, raise_errors = False)
+
     return samples, sample_list, transect_list, aliquots
 
 def writeToExcel(sample_stats: pd.DataFrame, aliquots: pd.DataFrame, filename: str, folder: str = 'Data_Sheets') -> None:
@@ -139,6 +143,145 @@ def writeToExcel(sample_stats: pd.DataFrame, aliquots: pd.DataFrame, filename: s
 #######################################################################
 # Functions for summary statistics of thermochronologic data 
 #######################################################################
+
+# Input validation: checks that the Samples and Aliquots sheets link up
+class SampleAliquotMismatchError(KeyError):
+    """
+    Raised when samples listed on the 'Samples' sheet can't be matched to rows on the 'Aliquots' sheet (or vice
+    versa). Subclasses KeyError so any existing `except KeyError` handling still catches it.
+    """
+    def __str__(self) -> str:
+        # KeyError normally wraps its message in quotes; return the plain multi-line message instead
+        return str(self.args[0]) if self.args else ''
+ 
+ 
+def _normalize_id(name) -> str:
+    """Lower-cases and strips separators so near-identical IDs (e.g. '22TTN02-AFT' vs '22ttn02_AFT ') compare equal."""
+    return ''.join(ch for ch in str(name).strip().lower() if ch not in ' -_.')
+ 
+ 
+def _suggest_matches(name, candidates, n: int = 3, cutoff: float = 0.75) -> List[str]:
+    """Returns likely intended matches for `name` from `candidates` (normalized matches first, then fuzzy matches)."""
+    candidates = [str(c) for c in pd.unique(pd.Series(list(candidates)).dropna())]
+    exact_normalized = [c for c in candidates if _normalize_id(c) == _normalize_id(name)]
+    if exact_normalized:
+        return exact_normalized[:n]
+    return difflib.get_close_matches(str(name), candidates, n=n, cutoff=cutoff)
+ 
+ 
+def _format_suggestions(name, candidates) -> str:
+    """Builds a ' Did you mean ...?' hint for `name` from a pool of candidate IDs (empty string if nothing is close)."""
+    suggestions = _suggest_matches(name, candidates)
+    if not suggestions:
+        return ''
+    if any(_normalize_id(s) == _normalize_id(name) for s in suggestions):
+        return f" Did you mean {', '.join(repr(s) for s in suggestions)}? (differs only in capitalization, spaces, " \
+               f"hyphens/underscores, or periods)"
+    return f" Closest match(es): {', '.join(repr(s) for s in suggestions)}."
+ 
+ 
+def validateSampleAliquotLinks(samples: pd.DataFrame, aliquots: pd.DataFrame, sample_list: List[Tuple[str, str]],
+    aliquots_to_keep: Optional[List[str]] = None, aliquots_to_reject: Optional[List[str]] = None,
+    raise_errors: bool = True) -> dict:
+    """
+    Checks that every sample on the 'Samples' sheet can be found on the 'Aliquots' sheet (and vice versa) before any
+    statistics are calculated, and reports likely typos when they can't.
+ 
+    Parameters
+    ----------
+    samples : pd.DataFrame
+        Database of sample information indexed by sample name.
+    aliquots : pd.DataFrame
+        Database of aliquot data indexed by aliquot name (many aliquots: 1 sample).
+    sample_list : List[Tuple[str, str]]
+        List of (sample name, mineral) tuples.
+    aliquots_to_keep, aliquots_to_reject : List[str], optional
+        User-specified outlier overrides; each must be an existing Aliquot ID.
+    raise_errors : bool, optional
+        If True (default), raises SampleAliquotMismatchError when errors are found. If False, issues warnings instead.
+ 
+    Returns
+    -------
+    dict
+        {'errors': [...], 'warnings': [...]} with one human-readable message per problem found.
+ 
+    Notes
+    -----
+    Fission track samples (AFT/ZFT) are looked up by Aliquot ID, so their single row on the 'Aliquots' sheet must have
+    an 'Aliquot' value identical to the sample name. All other samples are matched through the 'Sample' column of the
+    'Aliquots' sheet.
+    """
+    errors, warns = [], []
+ 
+    aliquot_ids = aliquots.index.astype(str)
+    aliquot_sample_names = aliquots['Sample'].dropna().astype(str)
+    sample_names = [str(s[0]) for s in sample_list]
+ 
+    # Duplicate IDs make .loc return several rows instead of one value
+    dup_samples = samples.index[samples.index.duplicated()].unique().tolist()
+    if dup_samples:
+        errors.append(f"Duplicate sample name(s) on the Samples sheet: {', '.join(map(repr, dup_samples))}.")
+ 
+    dup_aliquots = aliquots.index[aliquots.index.duplicated()].unique().tolist()
+    if dup_aliquots:
+        errors.append(f"Duplicate Aliquot ID(s) on the Aliquots sheet: {', '.join(map(repr, dup_aliquots))}.")
+ 
+    # Every sample on the Samples sheet needs matching aliquot data
+    for name, mineral in sample_list:
+        name = str(name)
+        mineral_str = str(mineral).strip().upper() if pd.notnull(mineral) else ''
+ 
+        if not mineral_str:
+            errors.append(f"Sample {name!r} has no Mineral listed on the Samples sheet.")
+            continue
+ 
+        if mineral_str in {'AFT', 'ZFT'}:
+            if name in aliquot_ids:
+                continue
+            msg = (f"{mineral_str} sample {name!r} (Samples sheet) has no row on the Aliquots sheet with "
+                   f"Aliquot = {name!r}. Fission track samples are matched by Aliquot ID, which must be identical "
+                   f"to the sample name.")
+            # Distinguish 'row exists but Aliquot ID differs' from 'row is missing or misspelled'
+            linked = aliquots.loc[aliquots['Sample'].astype(str) == name, 'Aliquot'].astype(str).tolist()
+            if linked:
+                msg += f" A row with Sample = {name!r} exists, but its Aliquot ID is {linked[0]!r}."
+            else:
+                msg += _format_suggestions(name, list(aliquot_ids) + list(aliquot_sample_names))
+            errors.append(msg)
+        else:
+            if (aliquot_sample_names == name).any():
+                continue
+            errors.append(f"{mineral_str} sample {name!r} (Samples sheet) has no aliquots on the Aliquots sheet "
+                          f"(no rows with Sample = {name!r})."
+                          + _format_suggestions(name, aliquot_sample_names))
+ 
+    # Aliquots whose sample isn't on the Samples sheet are silently ignored by the stats functions
+    orphans = sorted(set(aliquot_sample_names) - set(sample_names))
+    for orphan in orphans:
+        n = int((aliquot_sample_names == orphan).sum())
+        warns.append(f"{n} aliquot(s) on the Aliquots sheet list Sample = {orphan!r}, which isn't on the Samples "
+                     f"sheet; these will be ignored." + _format_suggestions(orphan, sample_names))
+ 
+    # Outlier overrides must name real aliquots (otherwise .loc silently adds a blank row)
+    for label, grains in (('aliquots_to_keep', aliquots_to_keep), ('aliquots_to_reject', aliquots_to_reject)):
+        for grain in grains or []:
+            if str(grain) not in aliquot_ids:
+                errors.append(f"{grain!r} in {label} is not an Aliquot ID on the Aliquots sheet."
+                              + _format_suggestions(grain, aliquot_ids))
+ 
+    if errors and raise_errors:
+        lines = [f"Found {len(errors)} problem(s) linking the Samples and Aliquots sheets:"]
+        lines += [f"  - {e}" for e in errors]
+        if warns:
+            lines += ["Also note:"] + [f"  - {w}" for w in warns]
+        lines.append("Fix the names in the input spreadsheet (or the override lists) and reload the data.")
+        raise SampleAliquotMismatchError('\n'.join(lines))
+ 
+    for message in (errors + warns):
+        warnings.warn(message, stacklevel=2)
+ 
+    return {'errors': errors, 'warnings': warns}
+
 def determineOutliersIQR(samples: pd.DataFrame, aliquots: pd.DataFrame, sample_list: List[str])-> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Determines the quantiles and outlier bounds for each sample in the sample_list and returns updated sample and
@@ -167,7 +310,7 @@ def determineOutliersIQR(samples: pd.DataFrame, aliquots: pd.DataFrame, sample_l
 
     for sample in sample_list:
         # fission track samples only have 1 "aliquot" per sample
-        if sample[1].upper() == 'AFT':
+        if sample[1].upper() in {'AFT', 'ZFT'}:
             # Get all aliquots associated with a single sample
             sample_df = aliquots[aliquots.Sample == sample[0]]
 
@@ -346,6 +489,7 @@ def viewOutliers(samples: pd.DataFrame, aliquots: pd.DataFrame, sample_list: Lis
     pd.DataFrame
         DataFrame of aliquots classified as outliers ('reject') according to the chosen scheme.
     """
+    validateSampleAliquotLinks(samples, aliquots, sample_list)
 
     if stat_scheme == 'IQR':
         samples_iqr, aliquots_iqr = determineOutliersIQR(samples, aliquots, sample_list)
@@ -396,6 +540,9 @@ def calculateFullSummaryStats(samples: pd.DataFrame, aliquots: pd.DataFrame, sam
         samples_stats = calculateWeightedInverseVarianceSummaryStats(samples_stats, aliquots_stats, sample_list)
         samples_stats = calculateWeightedRelativeDeviationSummaryStats(samples_stats, aliquots_stats, sample_list)
         return samples_stats, aliquots_stats
+
+    # Make sure every sample links to its aliquots before calculating anything
+    validateSampleAliquotLinks(samples, aliquots, sample_list, aliquots_to_keep, aliquots_to_reject)
 
     # Define default method and handle each scheme
     if stat_scheme == 'IQR':
@@ -597,7 +744,7 @@ def calculateWeightedRelativeDeviationSummaryStats(samples: pd.DataFrame, aliquo
     sample_update = samples.copy()
 
     for sample in sample_list:
-        if sample[1].upper() == 'AFT':
+        if sample[1].upper() in {'AFT', 'ZFT'}:
             mean = aliquots.loc[sample[0], 'Corrected_Date_Ma']
             stdev = aliquots.loc[sample[0], 'Corrected_Uncertainty_1σ_Ma']
 
@@ -1198,6 +1345,71 @@ def plotElevationProfile(samples: pd.DataFrame,
 
     plt.show()
 
+def _plotDepositionalAges(ax: Axes, plot_data: pd.DataFrame, position_variable: str, transect,
+                          age_on_x_axis: bool = True) -> None:
+    """
+    Draw hatched boxes showing depositional age ranges on an age-versus plot.
+
+    Each box spans Depositional_Age_LB to Depositional_Age_UB along the age axis and the
+    min-max range of position_variable for each transect/depositional-age group along the
+    other axis.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+        Axis to draw the boxes on.
+    plot_data : pd.DataFrame
+        Sample data being plotted. Must contain Depositional_Age_LB, Depositional_Age_UB,
+        Transect, and the position_variable column.
+    position_variable : str
+        The non-age plot variable: 'Latitude', 'Longitude', 'Elevation_m', or 'Structural_Level'.
+    transect : str or None
+        Transect being plotted; controls the minimum box size for elevation-type variables.
+    age_on_x_axis : bool, default=True
+        True if cooling age is on the x-axis (position on y); False if age is on the y-axis
+        (position on x).
+    """
+    # Minimum box extent along the position axis so narrow ranges still show a visible box
+    # (transect-mode value, all-data value)
+    min_extents = {'Latitude':         (0.15, 0.15),
+                   'Longitude':        (0.15, 0.15),
+                   'Elevation_m':      (20, 50),
+                   'Structural_Level': (20, 50)}
+
+    if position_variable not in min_extents:
+        raise ValueError(f"plotDepoAges is not supported for '{position_variable}'. "
+                         f"Use one of {list(min_extents)} or set plotDepoAges=False.")
+
+    depoAge_df = plot_data[['Transect', position_variable, 'Depositional_Age_LB', 'Depositional_Age_UB']]
+    depoAge_df = depoAge_df.groupby(['Transect', 'Depositional_Age_LB',
+                                     'Depositional_Age_UB']).agg({position_variable: ['min', 'max']}).reset_index()
+    depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
+
+    transect_min, all_min = min_extents[position_variable]
+    min_extent = transect_min if transect else all_min
+
+    for index, row in depoAge_df.iterrows():
+        age_start = row['Depositional_Age_LB_']
+        age_extent = row['Depositional_Age_UB_'] - age_start
+
+        pos_start = row[f'{position_variable}_min']
+        pos_extent = row[f'{position_variable}_max'] - pos_start
+        if pos_extent < min_extent:
+            pos_extent = min_extent
+
+        if age_on_x_axis:
+            anchor, width, height = (age_start, pos_start), age_extent, pos_extent
+        else:
+            anchor, width, height = (pos_start, age_start), pos_extent, age_extent
+
+        ax.add_patch(Rectangle(anchor, width, height,
+                               edgecolor = 'k',
+                               facecolor = 'whitesmoke',
+                               fill=True,
+                               alpha = 0.8,
+                               hatch = '//',
+                               zorder = 1000))
+
 def plotAgeVersus(samples: pd.DataFrame, 
                   aliquots: pd.DataFrame, 
                   figure_size: Tuple[float, float],
@@ -1349,8 +1561,8 @@ def plotAgeVersus(samples: pd.DataFrame,
     excludeZFTAliquotsRegression : list of str, optional
         List of aliquots to exclude from ZFT regression.
     plotDepoAges : bool, default=False
-        Whether to plot depositional age ranges as shaded boxes. Only applies when the
-        cooling age is plotted on the x-axis.
+        Whether to plot depositional age ranges as shaded boxes. Works with cooling age
+        on either axis.
     savefig : bool, optional
         If True, saves the plot.
     savefigFileName : str, optional
@@ -1534,6 +1746,10 @@ def plotAgeVersus(samples: pd.DataFrame,
                                 color = GREY60,
                                 weight = 'book',
                                 style = 'italic')
+
+        ### Depositional Ages
+        if plotDepoAges:
+            _plotDepositionalAges(ax, plot_data, x_variable, transect, age_on_x_axis=False)
 
         ### Axes and Spine Customization -----------------------------
         ax.spines["left"].set_color('k')
@@ -1722,61 +1938,7 @@ def plotAgeVersus(samples: pd.DataFrame,
 
         ### Depositional Ages
         if plotDepoAges:
-            
-            depoAge_df = plot_data[['Sample','Transect','Mineral','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level',
-                                    'Depositional_Age_LB','Depositional_Age_UB']]
-            depoAge_df = depoAge_df.groupby(['Transect','Depositional_Age_LB',
-                                                'Depositional_Age_UB']).agg({'Latitude':['min','max'],
-                                                                            'Longitude':['min','max'],
-                                                                            'Elevation_m':['min','max'],
-                                                                            'Structural_Level':['min','max']}).reset_index()
-            depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
-            
-            # CURRENTLY ONLY WORKS FOR LATITUDE - ADD ANOTHER OPTION FOR ELEVATION
-            for index, row in depoAge_df.iterrows():
-                width = row['Depositional_Age_UB_'] - row['Depositional_Age_LB_']
-
-                if y_variable == 'Latitude':
-                    height = row['Latitude_max'] - row['Latitude_min']
-                    anchor_y = row['Latitude_min']
-                    
-                    # for transects that span small Latitude range
-                    if height < 0.15:
-                        height = 0.15
-
-                elif y_variable == 'Elevation_m':
-                    height = row['Elevation_m_max'] - row['Elevation_m_min']
-                    anchor_y = row['Elevation_m_min']
-                    
-                    # for transects that span small Elevation range
-                    if transect:
-                        if height < 20:
-                            height = 20
-                    else:
-                        if height < 50:
-                            height = 50
-                
-                elif y_variable == 'Structural_Level':
-                    height = row['Structural_Level_max'] - row['Structural_Level_min']
-                    anchor_y = row['Structural_Level_min']
-                    
-                    # for transects that span small Structural_Level range
-                    if transect:
-                        if height < 20:
-                            height = 20
-                    else:
-                        if height < 50:
-                            height = 50
-                
-                anchor_x = row['Depositional_Age_LB_']
-                
-                ax.add_patch(Rectangle((anchor_x,anchor_y),width,height,
-                                        edgecolor = 'k',
-                                        facecolor = 'whitesmoke',
-                                        fill=True,
-                                        alpha = 0.8,
-                                        hatch = '//',
-                                        zorder = 1000))
+            _plotDepositionalAges(ax, plot_data, y_variable, transect)
 
         ### Axes and Spine Customization -----------------------------
         ax.spines["left"].set_color('k')
@@ -1989,8 +2151,8 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
     excludeZFTAliquotsRegression : list of str, optional
         List of aliquots to exclude from ZFT regression.
     plotDepoAges : bool, default=False
-        Whether to plot depositional age ranges as shaded boxes. Only applies when the
-        cooling age is plotted on the x-axis.
+        Whether to plot depositional age ranges as shaded boxes. Works with cooling age
+        on either axis.
     savefig : bool, optional
         If True, saves the plot.
     savefigFileName : str, optional
@@ -2195,61 +2357,7 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
                                 style = 'italic')
         ### Depositional Ages
         if plotDepoAges:
-            
-            depoAge_df = plot_data[['Sample','Transect','Mineral','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level',
-                                    'Depositional_Age_LB','Depositional_Age_UB']]
-            depoAge_df = depoAge_df.groupby(['Transect','Depositional_Age_LB',
-                                                'Depositional_Age_UB']).agg({'Latitude':['min','max'],
-                                                                            'Longitude':['min','max'],
-                                                                            'Elevation_m':['min','max'],
-                                                                            'Structural_Level':['min','max']}).reset_index()
-            depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
-            
-            # CURRENTLY ONLY WORKS FOR LATITUDE - ADD ANOTHER OPTION FOR ELEVATION
-            for index, row in depoAge_df.iterrows():
-                width = row['Depositional_Age_UB_'] - row['Depositional_Age_LB_']
-
-                if y_variable == 'Latitude':
-                    height = row['Latitude_max'] - row['Latitude_min']
-                    anchor_y = row['Latitude_min']
-                    
-                    # for transects that span small Latitude range
-                    if height < 0.15:
-                        height = 0.15
-
-                elif y_variable == 'Elevation_m':
-                    height = row['Elevation_m_max'] - row['Elevation_m_min']
-                    anchor_y = row['Elevation_m_min']
-                    
-                    # for transects that span small Elevation range
-                    if transect:
-                        if height < 20:
-                            height = 20
-                    else:
-                        if height < 50:
-                            height = 50
-                
-                elif y_variable == 'Structural_Level':
-                    height = row['Structural_Level_max'] - row['Structural_Level_min']
-                    anchor_y = row['Structural_Level_min']
-                    
-                    # for transects that span small Structural_Level range
-                    if transect:
-                        if height < 20:
-                            height = 20
-                    else:
-                        if height < 50:
-                            height = 50
-                
-                anchor_x = row['Depositional_Age_LB_']
-                
-                ax2.add_patch(Rectangle((anchor_x,anchor_y),width,height,
-                                        edgecolor = 'k',
-                                        facecolor = 'whitesmoke',
-                                        fill=True,
-                                        alpha = 0.8,
-                                        hatch = '//',
-                                        zorder = 1000))
+            _plotDepositionalAges(ax2, plot_data, y_variable, transect)
         ##########################
         ### Axes and Spine Customization ----------------------------- 
         ax2.spines["left"].set_color('k')
@@ -2448,6 +2556,10 @@ def plotAgeVersus_wHistogram(samples: pd.DataFrame,
                                 color = GREY60,
                                 weight = 'book',
                                 style = 'italic')
+        ### Depositional Ages
+        if plotDepoAges:
+            _plotDepositionalAges(ax2, plot_data, x_variable, transect, age_on_x_axis=False)
+
         ##########################
         ### Axes and Spine Customization -----------------------------
         ax1.invert_xaxis()
@@ -2893,61 +3005,7 @@ def plot_AgeVersus_wZoomIn(samples: pd.DataFrame,
                          style = 'italic')
     ### Depositional Ages
     if plotDepoAges:
-        
-        depoAge_df = plot_data[['Sample','Transect','Mineral','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level',
-                                'Depositional_Age_LB','Depositional_Age_UB']]
-        depoAge_df = depoAge_df.groupby(['Transect','Depositional_Age_LB',
-                                            'Depositional_Age_UB']).agg({'Latitude':['min','max'],
-                                                                        'Longitude':['min','max'],
-                                                                        'Elevation_m':['min','max'],
-                                                                        'Structural_Level':['min','max']}).reset_index()
-        depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
-        
-        # CURRENTLY ONLY WORKS FOR LATITUDE - ADD ANOTHER OPTION FOR ELEVATION
-        for index, row in depoAge_df.iterrows():
-            width = row['Depositional_Age_UB_'] - row['Depositional_Age_LB_']
-
-            if y_variable == 'Latitude':
-                height = row['Latitude_max'] - row['Latitude_min']
-                anchor_y = row['Latitude_min']
-                
-                # for transects that span small Latitude range
-                if height < 0.15:
-                    height = 0.15
-
-            elif y_variable == 'Elevation_m':
-                height = row['Elevation_m_max'] - row['Elevation_m_min']
-                anchor_y = row['Elevation_m_min']
-                
-                # for transects that span small Elevation range
-                if transect:
-                    if height < 20:
-                        height = 20
-                else:
-                    if height < 50:
-                        height = 50
-            
-            elif y_variable == 'Structural_Level':
-                height = row['Structural_Level_max'] - row['Structural_Level_min']
-                anchor_y = row['Structural_Level_min']
-                
-                # for transects that span small Structural_Level range
-                if transect:
-                    if height < 20:
-                        height = 20
-                else:
-                    if height < 50:
-                        height = 50
-            
-            anchor_x = row['Depositional_Age_LB_']
-            
-            ax2.add_patch(Rectangle((anchor_x,anchor_y),width,height,
-                                    edgecolor = 'k',
-                                    facecolor = 'whitesmoke',
-                                    fill=True,
-                                    alpha = 0.8,
-                                    hatch = '//',
-                                    zorder = 1000))
+        _plotDepositionalAges(ax2, plot_data, y_variable, transect)
 
     ### Axes and Spine Customization -----------------------------
     ## Inset
@@ -3416,62 +3474,7 @@ def plot_AgeVersus_wHistogram_wZoomIn(samples: pd.DataFrame,
             
     ### Depositional Ages
     if plotDepoAges:
-        
-        depoAge_df = plot_data[['Sample','Transect','Mineral','Latitude', 'Longitude', 'Elevation_m', 'Structural_Level',
-                              'Depositional_Age_LB','Depositional_Age_UB']]
-        depoAge_df = depoAge_df.groupby(['Transect','Depositional_Age_LB',
-                                         'Depositional_Age_UB']).agg({'Latitude':['min','max'],
-                                                                     'Longitude':['min','max'],
-                                                                     'Elevation_m':['min','max'],
-                                                                     'Structural_Level':['min','max']}).reset_index()
-        depoAge_df.columns = [f'{i}_{j}' for i, j in depoAge_df.columns]
-        
-        # CURRENTLY ONLY WORKS FOR LATITUDE - ADD ANOTHER OPTION FOR ELEVATION
-        for index, row in depoAge_df.iterrows():
-            width = row['Depositional_Age_UB_'] - row['Depositional_Age_LB_']
-
-            if y_variable == 'Latitude':
-                height = row['Latitude_max'] - row['Latitude_min']
-                anchor_y = row['Latitude_min']
-                
-                # for transects that span small Latitude range
-                if height < 0.15:
-                    height = 0.15
-
-            elif y_variable == 'Elevation_m':
-                height = row['Elevation_m_max'] - row['Elevation_m_min']
-                anchor_y = row['Elevation_m_min']
-                
-                # for transects that span small Elevation range
-                if transect:
-                    if height < 20:
-                        height = 20
-                else:
-                    if height < 50:
-                        height = 50
-            
-            elif y_variable == 'Structural_Level':
-                height = row['Structural_Level_max'] - row['Structural_Level_min']
-                anchor_y = row['Structural_Level_min']
-                
-                # for transects that span small Structural_Level range
-                if transect:
-                    if height < 20:
-                        height = 20
-                else:
-                    if height < 50:
-                        height = 50
-            
-        
-            anchor_x = row['Depositional_Age_LB_']
-            
-            ax4.add_patch(Rectangle((anchor_x,anchor_y),width,height,
-                                 edgecolor = 'k',
-                                 facecolor = 'whitesmoke',
-                                 fill=True,
-                                 alpha = 0.8,
-                                 hatch = '//',
-                                 zorder = 1000))
+        _plotDepositionalAges(ax4, plot_data, y_variable, transect)
 
     ### AXES AND SPINE CUSTOMIZATION -----------------------------
     ### Zoom In Histogram
