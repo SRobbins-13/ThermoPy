@@ -148,7 +148,7 @@ First, load the summary statistics calculated in Notebook 1:
 
 ```python
 # Load summary statistics
-filepath = 'example_data/summary_statistics_IQR.xlsx'
+filepath = 'Summary_Statistics/summary_statistics_IQR.xlsx'
 samples, sample_list, transect_list, aliquots = tFunc.loadDataExcel(filepath)
 ```
 
