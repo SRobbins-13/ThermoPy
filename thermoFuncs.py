@@ -1277,7 +1277,8 @@ def plotElevationProfile(samples: pd.DataFrame,
         # Optional sample label, only if the sample is within x_bounds
         if label_samples and (
             (x_bounds is None or (x_bounds[0] <= getattr(row, x_variable) <= x_bounds[1])) and
-            (y_bounds is None or (y_bounds[0] <= getattr(row, Elevation_m) <= y_bounds[1])) 
+            # (y_bounds is None or (y_bounds[0] <= getattr(row, Elevation_m) <= y_bounds[1])) 
+            (y_bounds is None or (y_bounds[0] <= row.Elevation_m <= y_bounds[1]))
         ):
             ax.text(
                 getattr(row, x_variable) + label_offset[0], 
